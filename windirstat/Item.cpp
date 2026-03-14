@@ -19,6 +19,9 @@
 #include "Item.h"
 #include "FinderBasic.h"
 #include "FinderNtfs.h"
+// Refactoring into legacy scan engine components - these includes will be removed once the legacy engine is fully decoupled from CItem
+#include "LegacyDiscoveryExtractor.h"
+#include "LegacyDiscoveryRequest.h"
 
 // --- Construction / Destruction ---
 
@@ -276,6 +279,42 @@ CItem* CItem::AddFile(const Finder& finder)
     child->SetAttributes(finder.GetAttributes());
     child->SetReparseTag(finder.GetReparseTag());
     if (finder.IsReserved() || this->IsTypeOrFlag(ITF_RESERVED)) child->SetFlag(ITF_RESERVED);
+    child->ExtensionDataAdd();
+    AddChild(child);
+    child->SetDone();
+    return child;
+}
+
+CItem* CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir) {
+    const bool follow = !dir.isProtectedReparsePoint &&
+        CDirStatApp::Get()->IsFollowingAllowed(dir.reparseTag);
+    auto* child = new CItem(IT_DIRECTORY, dir.name);
+    child->SetIndex(dir.index);
+    child->SetLastChange(dir.lastChange);
+    child->SetAttributes(dir.attributes);
+    child->SetReparseTag(dir.reparseTag);
+    if (dir.isReserved || IsTypeOrFlag(ITF_RESERVED)) {
+        child->SetFlag(ITF_RESERVED);
+    }
+    if (dir.isOffVolume && follow) {
+        child->SetFlag(ITF_BASIC);
+    }
+    AddChild(child);
+    child->UpwardAddReadJobs(follow ? 1 : 0);
+    return child;
+}
+
+CItem* CItem::AddFileFromDiscovery(const DiscoveredFile& file) {
+    auto* child = new CItem(IT_FILE, file.name);
+    child->SetIndex(file.index);
+    child->SetSizePhysical(file.sizePhysical);
+    child->SetSizeLogical(file.sizeLogical);
+    child->SetLastChange(file.lastChange);
+    child->SetAttributes(file.attributes);
+    child->SetReparseTag(file.reparseTag);
+    if (file.isReserved || IsTypeOrFlag(ITF_RESERVED)) {
+        child->SetFlag(ITF_RESERVED);
+    }
     child->ExtensionDataAdd();
     AddChild(child);
     child->SetDone();
@@ -858,103 +897,28 @@ void CItem::UpdateStatsFromDisk()
     }
 }
 
-void CItem::ScanItems(BlockingQueue<CItem*> * queue, FinderNtfsContext& contextNtfs, FinderBasicContext& contextBasic)
-{
-    FinderNtfs finderNtfs(&contextNtfs);
-    FinderBasic finderBasic(&contextBasic);
-
-    for (auto itemOpt = queue->Pop(); itemOpt.has_value(); itemOpt = queue->Pop())
-    {
-        // Fetch item from queue
+void CItem::ScanItems(BlockingQueue<CItem*>* queue, FinderNtfsContext& contextNtfs, FinderBasicContext& contextBasic) {
+    LegacyDiscoveryExtractor extractor;
+    for (auto itemOpt = queue->Pop(); itemOpt.has_value(); itemOpt = queue->Pop()) {
         CItem* const item = itemOpt.value();
-
-        // Mark the time we started evaluating this node
-        item->ResetScanStartTime();
-
-        // Try to load NTFS MFT
-        if (item->IsTypeOrFlag(IT_DRIVE) && COptions::UseFastScanEngine)
-        {
-            contextNtfs.LoadRoot(item);
-        }
-
-        if (item->IsTypeOrFlag(IT_DRIVE, IT_DIRECTORY))
-        {
-            Finder* finder = contextNtfs.IsLoaded() && !item->IsTypeOrFlag(ITF_BASIC) ?
-                reinterpret_cast<Finder*>(&finderNtfs) : reinterpret_cast<Finder*>(&finderBasic);
-
-            for (BOOL b = finder->FindFile(item); b; b = finder->FindNext())
-            {
-                if (finder->IsDirectory())
-                {
-                    if (COptions::ExcludeHiddenDirectory && finder->IsHidden() ||
-                        COptions::ExcludeProtectedDirectory && finder->IsHiddenSystem())
-                    {
-                        continue;
-                    }
-
-                    // Exclude directories matching path filter
-                    if (!COptions::FilteringExcludeDirsRegex.empty() && std::ranges::any_of(COptions::FilteringExcludeDirsRegex,
-                        [&finder](const auto& pattern) { return std::regex_match(finder->GetFilePath(), pattern); }))
-                    {
-                        continue;
-                    }
-
-                    item->UpwardAddFolders(1);
-                    if (CItem* newitem = item->AddDirectory(*finder); newitem->GetReadJobs() > 0)
-                    {
-                        queue->Push(newitem);
-                    }
-                }
-                else
-                {
-                    if (COptions::ExcludeHiddenFile && finder->IsHidden() ||
-                        COptions::ExcludeProtectedFile && finder->IsHiddenSystem() ||
-                        COptions::ExcludeSymbolicLinksFile && finder->GetReparseTag() == IO_REPARSE_TAG_SYMLINK)
-                    {
-                        continue;
-                    }
-
-                    // Exclude files matching name filter
-                    if (!COptions::FilteringExcludeFilesRegex.empty() && std::ranges::any_of(COptions::FilteringExcludeFilesRegex,
-                        [&finder](const auto& pattern) { return std::regex_match(finder->GetFileName(), pattern); }))
-                    {
-                        continue;
-                    }
-
-                    // Exclude files matching size filter
-                    if (COptions::FilteringSizeMinimumCalculated > 0 && finder->GetFileSizeLogical() < COptions::FilteringSizeMinimumCalculated)
-                    {
-                        continue;
-                    }
-
-                    item->UpwardAddFiles(1);
-                    CItem* newitem = item->AddFile(*finder);
-                    CFileDupeControl::Get()->ProcessDuplicate(newitem, queue);
-                    CFileTopControl::Get()->ProcessTop(newitem);
-                    queue->WaitIfSuspended();
-                }
-
-                // Update pacman position
-                item->UpwardDrivePacman();
+        LegacyDiscoveryRequest request;
+        request.item = item;
+        request.ntfsContext = &contextNtfs;
+        request.basicContext = &contextBasic;
+        DiscoveryBatch batch = extractor.Extract(request);
+        for (const auto& dir : batch.directories) {
+            item->UpwardAddFolders(1);
+            if (CItem* newitem = item->AddDirectoryFromDiscovery(dir); newitem->GetReadJobs() > 0) {
+                queue->Push(newitem);
             }
         }
-        else if (item->IsTypeOrFlag(IT_FILE))
-        {
-            // Only used for refreshes
-            item->UpdateStatsFromDisk();
-            CFileDupeControl::Get()->ProcessDuplicate(item, queue);
-            CFileTopControl::Get()->ProcessTop(item);
-            item->SetDone();
+        for (const auto& file : batch.files) {
+            item->UpwardAddFiles(1);
+            CItem* newitem = item->AddFileFromDiscovery(file);
+            CFileDupeControl::Get()->ProcessDuplicate(newitem, queue);
+            CFileTopControl::Get()->ProcessTop(newitem);
+            queue->WaitIfSuspended();
         }
-        else if (item->IsTypeOrFlag(IT_MYCOMPUTER))
-        {
-            for (const auto & child : item->GetChildren())
-            {
-                child->UpwardAddReadJobs(1);
-                queue->Push(child);
-            }
-        }
-        item->UpwardSubtractReadJobs(1);
         item->UpwardDrivePacman();
     }
 }

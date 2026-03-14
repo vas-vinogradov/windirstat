@@ -21,6 +21,8 @@
 #include "TreeListControl.h"
 #include "Finder.h"
 
+struct DiscoveredDirectory;
+struct DiscoveredFile;
 class Finder;
 class FinderNtfsContext;
 class FinderBasicContext;
@@ -243,6 +245,16 @@ public:
     void RemoveUnknownItem();
     void UpwardDrivePacman();
 
+    // Adds a directory using the DiscoveredDirectory DTO
+    CItem* AddDirectoryFromDiscovery(const DiscoveredDirectory& dir);
+    // Adds a file using the DiscoveredFile DTO
+    CItem* AddFileFromDiscovery(const DiscoveredFile& file);
+    // Existing Finder-based overloads (unchanged)
+    CItem* AddDirectory(const Finder& finder);
+    CItem* AddFile(const Finder& finder);
+
+
+
     // Hardlinks & Hashing
     void CreateHardlinksItem();
     CItem* FindHardlinksItem() const;
@@ -280,8 +292,7 @@ private:
     bool MustShowReadJobs() const noexcept;
     COLORREF GetPercentageColor() const noexcept;
     std::wstring GetPathWithoutSlash() const;
-    CItem* AddDirectory(const Finder& finder);
-    CItem* AddFile(const Finder& finder);
+
 
     // Special structure for container items that is separately allocated to
     // reduce memory usage.  This operates under the assumption that most

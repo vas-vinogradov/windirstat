@@ -79,6 +79,33 @@
     <Filter Include="Header Files\User Interface\Controls">
       <UniqueIdentifier>{463565AC-33C1-91A1-6035-48A265809213}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Engine">
+      <UniqueIdentifier>{a6e9208f-4f4d-47fa-be9d-98740101243e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Engine\Scanning">
+      <UniqueIdentifier>{d3726375-be4f-4dc6-9204-12d446796bc5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Contracts">
+      <UniqueIdentifier>{704e016b-009e-4dec-b26a-76f733821f74}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Adapters">
+      <UniqueIdentifier>{cb428fba-8da5-4f13-b075-3ce4435cf1a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Composition">
+      <UniqueIdentifier>{6acaadd6-dcbd-448a-ba92-1a6202d02c44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine">
+      <UniqueIdentifier>{89840900-afaa-4046-8979-dc6ffb0182b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine\Scanning">
+      <UniqueIdentifier>{32b50b7b-465a-44da-91d2-a1953a0acf26}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Adapters">
+      <UniqueIdentifier>{2ab0fb63-4a11-4cda-bc70-67ec3ccdf0e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Composition">
+      <UniqueIdentifier>{b1e02b54-2025-4c50-ada2-931c68346bad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\windirstat.manifest">
@@ -275,6 +302,60 @@
     <ClInclude Include="Localization.h">
       <Filter>Header Files\User Interface</Filter>
     </ClInclude>
+    <ClInclude Include="IScanEngine.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="LegacyScanEngine.h">
+      <Filter>Header Files\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanResultToCItemMapper.h">
+      <Filter>Header Files\Adapters</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanResult.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanNode.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanRequest.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanEngineFactory.h">
+      <Filter>Header Files\Composition</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveredFile.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveredDirectory.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveryBatch.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="IDirectoryScanner.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanTask.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="IDiscoveryBatchSink.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanScheduler.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="LegacyDiscoveryRequest.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="LegacyDiscoveryExtractor.h">
+      <Filter>Header Files\Engine\Scanning</Filter>
+    </ClInclude>
+    <ClInclude Include="IDiscoverySink.h">
+      <Filter>Header Files\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="ItemDiscoverySink.h">
+      <Filter>Header Files\Adapters</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dialogs\AboutDlg.cpp">
@@ -426,6 +507,21 @@
     </ClCompile>
     <ClCompile Include="Localization.cpp">
       <Filter>Source Files\User Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="LegacyScanEngine.cpp">
+      <Filter>Source Files\Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="ScanResultToCItemMapper.cpp">
+      <Filter>Source Files\Adapters</Filter>
+    </ClCompile>
+    <ClCompile Include="ScanEngineFactory.cpp">
+      <Filter>Source Files\Composition</Filter>
+    </ClCompile>
+    <ClCompile Include="LegacyDiscoveryExtractor.cpp">
+      <Filter>Source Files\Engine\Scanning</Filter>
+    </ClCompile>
+    <ClCompile Include="ItemDiscoverySink.cpp">
+      <Filter>Source Files\Adapters</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -24,10 +24,14 @@
 #include "FileWatcherControl.h"
 #include "FinderBasic.h"
 #include "FinderNtfs.h"
+#include "IScanEngine.h"
 #include "SearchDlg.h"
 #include "ProgressDlg.h"
+#include "ScanEngineFactory.h"
 
 IMPLEMENT_DYNCREATE(CDirStatDoc, CDocument)
+
+std::unique_ptr<IScanEngine> m_scanEngine;
 
 CDirStatDoc::CDirStatDoc() :
         m_showFreeSpace(COptions::ShowFreeSpace)
@@ -36,10 +40,26 @@ CDirStatDoc::CDirStatDoc() :
     ASSERT(nullptr == s_singleton);
     s_singleton = this;
 
+    InitializeScanEngine();
 
     VTRACE(L"sizeof(CItem) = {}", sizeof(CItem));
     VTRACE(L"sizeof(CTreeListItem) = {}", sizeof(CTreeListItem));
     VTRACE(L"sizeof(CWdsListItem) = {}", sizeof(CWdsListItem));
+}
+
+void CDirStatDoc::InitializeScanEngine() {
+    // Use the factory to create the scan engine
+    m_scanEngine = ScanEngineFactory::Create();
+}
+
+void CDirStatDoc::StartScan(const std::wstring& rootPath) {
+    // Build a ScanRequest
+    ScanRequest request(rootPath);
+    // Call the scan engine
+    std::unique_ptr<ScanResult> result = m_scanEngine->Scan(request);
+    // Map the result to CItem
+    std::unique_ptr<CItem> rootItem = m_mapper->Map(*result);
+    // TODO: Update the UI or document model with the rootItem
 }
 
 CDirStatDoc::~CDirStatDoc()

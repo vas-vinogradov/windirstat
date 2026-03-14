@@ -18,7 +18,10 @@
 #pragma once
 
 #include "pch.h"
+
+#include "IScanEngine.h"
 #include "TreeListControl.h"
+#include <ScanResultToCItemMapper.h>
 
 class CItem;
 class CItemDupe;
@@ -81,6 +84,13 @@ class CDirStatDoc final : public CDocument
 {
 public:
     static CDirStatDoc* Get() { return s_singleton; }
+    void StartScan(const std::wstring& rootPath);
+
+private:
+    std::unique_ptr<IScanEngine> m_scanEngine;
+    std::unique_ptr<ScanResultToCItemMapper> m_mapper;
+    // Helper to initialize the scan engine
+    void InitializeScanEngine();
 
 protected:
     CDirStatDoc(); // Created by MFC only
