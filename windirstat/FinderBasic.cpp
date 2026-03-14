@@ -158,12 +158,12 @@ bool FinderBasic::FindNext()
     else return success;
 }
 
-bool FinderBasic::FindFile(const CItem* item)
+bool FinderBasic::FindFile(const std::wstring& strFolder, ULONGLONG index, const DWORD attr)
 {
-    return FindFile(item->GetPath(), L"", item->GetAttributes());
+    return FinderBasic::FindFileInternal(strFolder, L"", attr);
 }
 
-bool FinderBasic::FindFile(const std::wstring & strFolder, const std::wstring& strName, const DWORD attr)
+bool FinderBasic::FindFileInternal(const std::wstring & strFolder, const std::wstring& strName, const DWORD attr)
 {
     // initialize run
     m_firstRun = true;
@@ -269,7 +269,8 @@ bool FinderBasic::DoesFileExist(const std::wstring& folder, const std::wstring& 
 
     // Use this method over GetFileAttributes() as GetFileAttributes() will
     // return valid INVALID_FILE_ATTRIBUTES on locked files
-    return FinderBasic(true).FindFile(
+    return FinderBasic(true).FindFileInternal(
         p.parent_path().wstring(),
-        p.filename().wstring());
+        p.filename().wstring(),
+        INVALID_FILE_ATTRIBUTES);
 }

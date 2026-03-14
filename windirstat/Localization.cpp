@@ -16,7 +16,9 @@
 //
 
 #include "pch.h"
-#include "FinderBasic.h"
+
+#include "FileEnumeration.h"
+#include "FileSystem.h"
 
 std::unordered_map<std::wstring, std::wstring> Localization::m_map;
 
@@ -80,10 +82,9 @@ std::set<LANGID> Localization::GetLanguageList()
     }
 
     // Also check for external language files
-    FinderBasic finder;
-    for (BOOL b = finder.FindFile(GetAppFolder(), L"lang_*.txt"); b; b = finder.FindNext())
+    for (const auto& fileName : FileEnumeration::EnumerateFileNames(GetAppFolder(), L"lang-*.txt"))
     {
-        auto langString = finder.GetFileName().substr(5);
+        auto langString = fileName.substr(5);
         langString = langString.substr(0, langString.find_first_of(L'.'));
         uniqueLangs.emplace(langString);
     }
@@ -200,7 +201,7 @@ bool Localization::LoadExternalLanguage(const LCTYPE lcttype, const LCID lcid)
     const std::wstring name = L"lang_" + GetLocaleString(lcttype, lcid) + L".txt";
     const std::wstring langFolder = GetAppFolder() + L"\\";
 
-    return FinderBasic::DoesFileExist(langFolder, name) && LoadFile(langFolder + name);
+    return FileSystem::FileExists(langFolder + name) && LoadFile(langFolder + name);
 }
 
 bool Localization::LoadFile(const std::wstring& file)

@@ -20,8 +20,10 @@
 #include "FinderBasic.h"
 #include "FinderNtfs.h"
 // Refactoring into legacy scan engine components - these includes will be removed once the legacy engine is fully decoupled from CItem
+#include "ItemDiscoverySink.h"
 #include "LegacyDiscoveryExtractor.h"
 #include "LegacyDiscoveryRequest.h"
+#include "ScanScheduler.h"
 
 // --- Construction / Destruction ---
 
@@ -868,7 +870,7 @@ void CItem::UpdateStatsFromDisk()
     if (IsTypeOrFlag(IT_DIRECTORY, IT_FILE))
     {
         FinderBasic finder(true);
-        if (finder.FindFile(GetFolderPath(), IsTypeOrFlag(ITF_ROOTITEM) ? std::wstring() : GetName(), GetAttributes()))
+        if (finder.FindFileInternal(GetFolderPath(), IsTypeOrFlag(ITF_ROOTITEM) ? std::wstring() : GetName(), GetAttributes()))
         {
             SetLastChange(finder.GetLastWriteTime());
             SetAttributes(finder.GetAttributes());
@@ -897,30 +899,15 @@ void CItem::UpdateStatsFromDisk()
     }
 }
 
-void CItem::ScanItems(BlockingQueue<CItem*>* queue, FinderNtfsContext& contextNtfs, FinderBasicContext& contextBasic) {
-    LegacyDiscoveryExtractor extractor;
-    for (auto itemOpt = queue->Pop(); itemOpt.has_value(); itemOpt = queue->Pop()) {
-        CItem* const item = itemOpt.value();
-        LegacyDiscoveryRequest request;
-        request.item = item;
-        request.ntfsContext = &contextNtfs;
-        request.basicContext = &contextBasic;
-        DiscoveryBatch batch = extractor.Extract(request);
-        for (const auto& dir : batch.directories) {
-            item->UpwardAddFolders(1);
-            if (CItem* newitem = item->AddDirectoryFromDiscovery(dir); newitem->GetReadJobs() > 0) {
-                queue->Push(newitem);
-            }
-        }
-        for (const auto& file : batch.files) {
-            item->UpwardAddFiles(1);
-            CItem* newitem = item->AddFileFromDiscovery(file);
-            CFileDupeControl::Get()->ProcessDuplicate(newitem, queue);
-            CFileTopControl::Get()->ProcessTop(newitem);
-            queue->WaitIfSuspended();
-        }
-        item->UpwardDrivePacman();
-    }
+void CItem::ScanItems(
+    BlockingQueue<CItem*>* queue,
+    FinderNtfsContext& contextNtfs,
+    FinderBasicContext& contextBasic)
+{
+    CItemDiscoverySink sink(*queue);
+    ScanScheduler scheduler;
+
+    scheduler.Run(*queue, contextNtfs, contextBasic, sink);
 }
 
 void CItem::ScanItemsFinalize(CItem* item)

@@ -84,8 +84,8 @@ public:
     ~FinderBasic() = default;
 
     bool FindNext() override;
-    bool FindFile(const CItem* item) override;
-    bool FindFile(const std::wstring& strFolder, const std::wstring& strName = L"", DWORD attr = INVALID_FILE_ATTRIBUTES);
+    bool FindFile(const std::wstring& strFolder, ULONGLONG index=-1, DWORD attr = INVALID_FILE_ATTRIBUTES) override;
+    bool FindFileInternal(const std::wstring& strFolder, const std::wstring& strName, const DWORD attr);
     inline DWORD GetAttributes() const override;
     inline std::wstring GetFileName() const override;
     inline ULONGLONG GetFileSizePhysical() const override;

@@ -53,7 +53,7 @@ class FinderNtfsContext final
 public:
 
     FinderNtfsContext() = default;
-    bool LoadRoot(CItem* driveitem);
+    // bool LoadRoot(const std::wstring& volumePathInput);
     bool IsLoaded() const { return m_isLoaded; }
 
     static constexpr ULONGLONG NtfsNodeRoot = 5;
@@ -77,7 +77,7 @@ public:
     explicit FinderNtfs(FinderNtfsContext* master) : m_master(master) {}
 
     bool FindNext() override;
-    bool FindFile(const CItem* item) override;
+    virtual bool FindFile(const std::wstring& path, ULONGLONG index, DWORD attributes) override;
     DWORD GetAttributes() const override;
     ULONGLONG GetIndex() const override;
     DWORD GetReparseTag() const override;

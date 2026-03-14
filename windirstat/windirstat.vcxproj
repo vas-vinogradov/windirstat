@@ -553,6 +553,8 @@
     <ClInclude Include="DiscoveredDirectory.h" />
     <ClInclude Include="DiscoveredFile.h" />
     <ClInclude Include="DiscoveryBatch.h" />
+    <ClInclude Include="FileEnumeration.h" />
+    <ClInclude Include="FileSystem.h" />
     <ClInclude Include="HelpersInterface.h" />
     <ClInclude Include="HelpersTasks.h" />
     <ClInclude Include="IDirectoryScanner.h" />
@@ -629,6 +631,8 @@
     <ClCompile Include="Dialogs\ProgressDlg.cpp" />
     <ClCompile Include="DirStatDoc.cpp">
     </ClCompile>
+    <ClCompile Include="FileEnumeration.cpp" />
+    <ClCompile Include="FileSystem.cpp" />
     <ClCompile Include="Item.Extended.cpp" />
     <ClCompile Include="ItemDiscoverySink.cpp" />
     <ClCompile Include="LegacyDiscoveryExtractor.cpp" />
@@ -636,6 +640,7 @@
     <ClCompile Include="Pages\PagePrompts.cpp" />
     <ClCompile Include="ScanEngineFactory.cpp" />
     <ClCompile Include="ScanResultToCItemMapper.cpp" />
+    <ClCompile Include="ScanScheduler.cpp" />
     <ClCompile Include="Views\ControlView.cpp" />
     <ClCompile Include="Controls\FileSearchControl.cpp" />
     <ClCompile Include="FinderBasic.cpp" />

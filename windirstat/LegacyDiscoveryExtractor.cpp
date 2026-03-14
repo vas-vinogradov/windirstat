@@ -6,15 +6,15 @@
 
 DiscoveryBatch LegacyDiscoveryExtractor::Extract(const LegacyDiscoveryRequest& request) {
     DiscoveryBatch batch;
-    batch.scannedPath = request.item->GetPath();
+    batch.scannedPath = request.path;
     Finder* finder = nullptr;
-    if (request.ntfsContext->IsLoaded() && !request.item->IsTypeOrFlag(ITF_BASIC)) {
+    if (request.ntfsContext->IsLoaded() && !request.forceBasic) {
         finder = new FinderNtfs(request.ntfsContext);
     }
     else {
         finder = new FinderBasic(request.basicContext);
     }
-    if (!finder->FindFile(request.item)) {
+    if (!finder->FindFile(request.path,request.index,request.attributes)) {
         delete finder;
         return batch;
     }

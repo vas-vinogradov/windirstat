@@ -106,6 +106,21 @@
     <Filter Include="Source Files\Composition">
       <UniqueIdentifier>{b1e02b54-2025-4c50-ada2-931c68346bad}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Engine\Scanning\Discovery">
+      <UniqueIdentifier>{57a7ba19-86a0-4631-9364-c61437a6e64b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Engine\Scanning\Pipeline">
+      <UniqueIdentifier>{ca2b1bb4-c424-4e13-8eb9-f4b19fd49b24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Engine\Scanning\Sink">
+      <UniqueIdentifier>{c463af24-206a-44d9-b820-61ba17335200}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine\Scanning\Pipeline">
+      <UniqueIdentifier>{608dcea8-2ed4-4f44-bb14-e8e63ae6b56f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine\Scanning\Discovery">
+      <UniqueIdentifier>{0e21dd0c-880b-4f5d-aac1-32d8b95c60c5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\windirstat.manifest">
@@ -323,38 +338,44 @@
     <ClInclude Include="ScanEngineFactory.h">
       <Filter>Header Files\Composition</Filter>
     </ClInclude>
-    <ClInclude Include="DiscoveredFile.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="DiscoveredDirectory.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="DiscoveryBatch.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="IDirectoryScanner.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="ScanTask.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="IDiscoveryBatchSink.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="ScanScheduler.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="LegacyDiscoveryRequest.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
+    <ClInclude Include="ItemDiscoverySink.h">
+      <Filter>Header Files\Adapters</Filter>
     </ClInclude>
     <ClInclude Include="LegacyDiscoveryExtractor.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveredFile.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveredDirectory.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveryBatch.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="IDirectoryScanner.h">
+      <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanTask.h">
+      <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanScheduler.h">
+      <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="IDiscoveryBatchSink.h">
+      <Filter>Header Files\Engine\Scanning\Sink</Filter>
+    </ClInclude>
+    <ClInclude Include="LegacyDiscoveryRequest.h">
       <Filter>Header Files\Engine\Scanning</Filter>
     </ClInclude>
     <ClInclude Include="IDiscoverySink.h">
       <Filter>Header Files\Core</Filter>
     </ClInclude>
-    <ClInclude Include="ItemDiscoverySink.h">
-      <Filter>Header Files\Adapters</Filter>
+    <ClInclude Include="FileSystem.h">
+      <Filter>Header Files\Core\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="FileEnumeration.h">
+      <Filter>Header Files\Core\Helpers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -517,11 +538,20 @@
     <ClCompile Include="ScanEngineFactory.cpp">
       <Filter>Source Files\Composition</Filter>
     </ClCompile>
-    <ClCompile Include="LegacyDiscoveryExtractor.cpp">
-      <Filter>Source Files\Engine\Scanning</Filter>
-    </ClCompile>
     <ClCompile Include="ItemDiscoverySink.cpp">
       <Filter>Source Files\Adapters</Filter>
+    </ClCompile>
+    <ClCompile Include="LegacyDiscoveryExtractor.cpp">
+      <Filter>Source Files\Engine\Scanning\Discovery</Filter>
+    </ClCompile>
+    <ClCompile Include="ScanScheduler.cpp">
+      <Filter>Source Files\Engine\Scanning\Discovery</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystem.cpp">
+      <Filter>Source Files\Core\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="FileEnumeration.cpp">
+      <Filter>Source Files\Core\Helpers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

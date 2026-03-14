@@ -9,11 +9,10 @@ class BlockingQueue;
 class CItemDiscoverySink : public IDiscoverySink
 {
 public:
-    CItemDiscoverySink(CItem& parent, BlockingQueue<CItem*>& queue);
+    explicit CItemDiscoverySink(BlockingQueue<CItem*>& queue);
 
-    void Apply(const DiscoveryBatch& batch) override;
+    void Apply(CItem& item, const DiscoveryBatch& batch) override;
 
 private:
-    CItem& m_parent;
     BlockingQueue<CItem*>& m_queue;
 };

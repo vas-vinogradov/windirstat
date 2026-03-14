@@ -7,7 +7,12 @@ class FinderBasicContext;
 
 struct LegacyDiscoveryRequest
 {
-    CItem* item = nullptr;
+    std::wstring path;
+    ULONGLONG index = 0;
+    DWORD attributes = 0;
+
+    bool forceBasic = false;
+
     FinderNtfsContext* ntfsContext = nullptr;
     FinderBasicContext* basicContext = nullptr;
 };
