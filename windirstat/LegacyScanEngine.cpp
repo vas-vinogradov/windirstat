@@ -10,15 +10,14 @@
            
 LegacyScanEngine::~LegacyScanEngine() = default;
 
-void LegacyScanEngine::Scan(std::vector<ScanTask> rootTasks, IDiscoverySink& sink)
+void LegacyScanEngine::Scan(
+    std::vector<ScanTask> rootTasks,
+    IDiscoverySink& sink)
 {
     BlockingQueue<ScanTask> queue;
-    
+
     for (const auto& rootTask : rootTasks)
-    {
         queue.Push(rootTask);
-    }
-    
 
     while (true)
     {
@@ -26,17 +25,23 @@ void LegacyScanEngine::Scan(std::vector<ScanTask> rootTasks, IDiscoverySink& sin
         if (!task.has_value())
             break;
 
+        const std::wstring scannedPath = task->path;
+
         LegacyDiscoveryRequest request{};
-        request.path = task->path;
+        request.path = scannedPath;
         request.ntfsContext = &m_contextNtfs;
         request.basicContext = &m_contextBasic;
 
         DiscoveryBatch batch = m_extractor.Extract(request);
-        batch.scannedPath = task->path;
+        batch.scannedPath = scannedPath;
 
-        auto nextTasks = sink.Apply(batch);
+        auto childTasks = sink.Apply(batch);
 
-        for (const auto& nextTask : nextTasks)
-            queue.Push(nextTask);
+        for (const auto& childTask : childTasks)
+            queue.Push(childTask);
+
+        // Critical missing completion boundary from old scan loop
+        sink.CompleteTask(scannedPath);
     }
 }
+

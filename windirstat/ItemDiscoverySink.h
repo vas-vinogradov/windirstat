@@ -1,12 +1,11 @@
 ﻿#pragma once
 
+#include <string>
+#include <vector>
 #include "IDiscoverySink.h"
 
-struct ScanTask;
-class CItem;
 class CDirStatDoc;
-template<typename T>
-class BlockingQueue;
+class CItem;
 
 class CItemDiscoverySink : public IDiscoverySink
 {
@@ -14,8 +13,9 @@ public:
     explicit CItemDiscoverySink(CDirStatDoc& doc);
 
     std::vector<ScanTask> Apply(const DiscoveryBatch& batch) override;
+    void CompleteTask(const std::wstring& path) override;
+
 private:
-    CItem* FindItemByPath(const std::wstring& path) const;
-    
     CDirStatDoc& m_doc;
+    CItem* FindItemByPath(const std::wstring& path) const;
 };

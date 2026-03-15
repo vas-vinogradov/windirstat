@@ -68,26 +68,46 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
         return {};
     }
 
-    for (const auto& dir : batch.directories) {
+    for (const auto& dir : batch.directories)
+    {
         item->UpwardAddFolders(1);
 
-        if (CItem* newitem = item->AddDirectoryFromDiscovery(dir); newitem->GetReadJobs() > 0) {
+        if (CItem* newitem = item->AddDirectoryFromDiscovery(dir); newitem->GetReadJobs() > 0)
+        {
             childTasks.push_back(ScanTask{ newitem->GetPath() });
         }
     }
 
-    for (const auto& file : batch.files) {
+    for (const auto& file : batch.files)
+    {
         item->UpwardAddFiles(1);
 
         CItem* newitem = item->AddFileFromDiscovery(file);
 
-        //CFileDupeControl::Get()->ProcessDuplicate(newitem, &m_queue);
+        // CFileDupeControl::Get()->ProcessDuplicate(newitem, &m_queue);
         CFileTopControl::Get()->ProcessTop(newitem);
     }
 
-    item->UpwardSubtractReadJobs(1);
     item->UpwardDrivePacman();
 
     return childTasks;
 }
+
+void CItemDiscoverySink::CompleteTask(const std::wstring& path)
+{
+    CItem* item = FindItemByPath(path);
+    ASSERT(item != nullptr);
+    if (item == nullptr)
+    {
+        return;
+    }
+
+    // Restore old loop completion semantics:
+    // when one directory task is fully processed, subtract its read job.
+    // If the subtree reaches zero outstanding jobs, UpwardSubtractReadJobs()
+    // will trigger SetDone() naturally.
+    item->UpwardSubtractReadJobs(1);
+    item->UpwardDrivePacman();
+}
+
 
