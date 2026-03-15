@@ -558,11 +558,13 @@
     <ClInclude Include="HelpersInterface.h" />
     <ClInclude Include="HelpersTasks.h" />
     <ClInclude Include="IDirectoryScanner.h" />
+    <ClInclude Include="IDiscoveryLink.h" />
     <ClInclude Include="IDiscoveryBatchSink.h" />
     <ClInclude Include="IDiscoverySink.h" />
     <ClInclude Include="IScanEngine.h" />
     <ClInclude Include="ItemDiscoverySink.h" />
     <ClInclude Include="LegacyDiscoveryExtractor.h" />
+    <ClInclude Include="LegacyDiscoveryLink.h" />
     <ClInclude Include="LegacyDiscoveryRequest.h" />
     <ClInclude Include="LegacyScanEngine.h" />
     <ClInclude Include="Pages\PagePrompts.h" />
@@ -636,6 +638,7 @@
     <ClCompile Include="Item.Extended.cpp" />
     <ClCompile Include="ItemDiscoverySink.cpp" />
     <ClCompile Include="LegacyDiscoveryExtractor.cpp" />
+    <ClCompile Include="LegacyDiscoveryLink.cpp" />
     <ClCompile Include="LegacyScanEngine.cpp" />
     <ClCompile Include="Pages\PagePrompts.cpp" />
     <ClCompile Include="ScanEngineFactory.cpp" />

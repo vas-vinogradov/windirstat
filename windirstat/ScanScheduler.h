@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "IDiscoveryLink.h"
 
 class CItem;
 template<typename T>
@@ -11,9 +12,5 @@ class IDiscoverySink;
 class ScanScheduler
 {
 public:
-    void Run(
-        BlockingQueue<CItem*>& queue,
-        FinderNtfsContext& contextNtfs,
-        FinderBasicContext& contextBasic,
-        IDiscoverySink& sink);
+  //  void Run(const ScanTask& rootTask, IDiscoveryLink& discoveryLink);
 };

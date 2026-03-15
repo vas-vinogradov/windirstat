@@ -214,7 +214,7 @@ public:
     void SortItemsBySizePhysical() const;
     void SortItemsBySizeLogical() const;
     void UpdateStatsFromDisk();
-    static void ScanItems(BlockingQueue<CItem*>*, FinderNtfsContext& contextNtfs, FinderBasicContext& contextBasic);
+    static void ScanItems(BlockingQueue<CItem*>*);
     static void ScanItemsFinalize(CItem* item);
     static std::vector<CItem*> GetItemsRecursive(const std::vector<CItem*>& initialItems,
         const std::function<bool(CItem*)>& task = [](const CItem* item) { return item->IsTypeOrFlag(IT_FILE); });

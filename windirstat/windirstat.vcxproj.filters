@@ -377,6 +377,12 @@
     <ClInclude Include="FileEnumeration.h">
       <Filter>Header Files\Core\Helpers</Filter>
     </ClInclude>
+    <ClInclude Include="IDiscoveryLink.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="LegacyDiscoveryLink.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dialogs\AboutDlg.cpp">
@@ -552,6 +558,9 @@
     </ClCompile>
     <ClCompile Include="FileEnumeration.cpp">
       <Filter>Source Files\Core\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="LegacyDiscoveryLink.cpp">
+      <Filter>Source Files\Engine\Scanning\Discovery</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

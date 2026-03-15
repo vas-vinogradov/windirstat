@@ -4,10 +4,13 @@
 
 #include "ScanRequest.h"
 #include "ScanResult.h"
+#include "ScanTask.h"
+
+class IDiscoverySink;
 
 class IScanEngine
 {
 public:
     virtual ~IScanEngine() = default;
-    virtual std::unique_ptr<ScanResult> Scan(const ScanRequest& request) = 0;
+    virtual void Scan(std::vector<ScanTask>, IDiscoverySink& sink) = 0;
 };

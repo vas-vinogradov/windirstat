@@ -5,29 +5,23 @@
 #include "LegacyDiscoveryRequest.h"
 #include "IDiscoverySink.h"
 #include "BlockingQueue.h"
+#include "IDiscoveryLink.h"
 #include "Item.h"
+#include "ScanTask.h"
+#include "BlockingQueue.h"
 
-void ScanScheduler::Run(
-    BlockingQueue<CItem*>& queue,
-    FinderNtfsContext& contextNtfs,
-    FinderBasicContext& contextBasic,
-    IDiscoverySink& sink)
+/*void ScanScheduler::Run(const ScanTask& rootTask, IDiscoveryLink& discoveryLink)
 {
-    LegacyDiscoveryExtractor extractor;
+    BlockingQueue<ScanTask> queue;
+    queue.Push(rootTask);
 
-    for (auto itemOpt = queue.Pop(); itemOpt.has_value(); itemOpt = queue.Pop()) {
-        CItem* const item = itemOpt.value();
-
-        LegacyDiscoveryRequest request;
-        request.path = item->GetPath();
-        request.index = item->GetIndex();
-        request.attributes = item->GetAttributes();
-        request.forceBasic = item->IsTypeOrFlag(ITF_BASIC);
-        request.ntfsContext = &contextNtfs;
-        request.basicContext = &contextBasic;
-
-        DiscoveryBatch batch = extractor.Extract(request);
-
-        sink.Apply(*item, batch);
+    while (true) {
+        auto task = queue.Pop() */ /* pop next task */;
+        /*if (!task.has_value()) {
+            // No more tasks to process, exit the loop
+            break;
+        }
+        discoveryLink.Process(task.value(), queue);
     }
 }
+*/

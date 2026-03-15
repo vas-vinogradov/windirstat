@@ -73,6 +73,20 @@ CTreeMap::Options CTreeMap::GetOptions() const
 }
 
 #ifdef _DEBUG
+
+void DumpChildren(const CItem* item)
+{
+    TRACE(L"\nParent: %s\n", item->GetPath().c_str());
+    for (int i = 0; i < item->TmiGetChildCount(); ++i)
+    {
+        const CItem* child = item->TmiGetChild(i);
+        TRACE(L"  [%d] %s  size=%llu\n",
+            i,
+            child->GetPath().c_str(),
+            child->TmiGetSize());
+    }
+}
+
 void CTreeMap::RecurseCheckTree(const CItem* item)
 {
     if (item->TmiIsLeaf())
@@ -87,6 +101,7 @@ void CTreeMap::RecurseCheckTree(const CItem* item)
         {
             const CItem* child = item->TmiGetChild(i);
             const ULONGLONG size = child->TmiGetSize();
+            DumpChildren(child);
             ASSERT(size <= last);
             sum += size;
             last = size;

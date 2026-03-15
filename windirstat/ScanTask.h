@@ -3,5 +3,5 @@
 
 struct ScanTask
 {
-    std::wstring directoryPath;
+    std::wstring path;
 };

@@ -85,6 +85,7 @@ class CDirStatDoc final : public CDocument
 public:
     static CDirStatDoc* Get() { return s_singleton; }
     void StartScan(const std::wstring& rootPath);
+    IScanEngine* GetScanEngine() const;
 
 private:
     std::unique_ptr<IScanEngine> m_scanEngine;
@@ -158,6 +159,9 @@ protected:
     void InvalidateSelectionCache();
     static CTreeListControl* GetFocusControl();
     void UpdateAllViews(CView* pSender, VIEW_HINT hint = HINT_NULL, CItem* pHint = nullptr);
+    CItem* FindItemByPath(const std::wstring& path) const;
+    static CItem* FindItemByPathRecursive(CItem* node, const std::wstring& path);
+    
 
     static CDirStatDoc* s_singleton;
 

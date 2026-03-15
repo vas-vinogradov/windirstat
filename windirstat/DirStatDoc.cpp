@@ -52,14 +52,8 @@ void CDirStatDoc::InitializeScanEngine() {
     m_scanEngine = ScanEngineFactory::Create();
 }
 
-void CDirStatDoc::StartScan(const std::wstring& rootPath) {
-    // Build a ScanRequest
-    ScanRequest request(rootPath);
-    // Call the scan engine
-    std::unique_ptr<ScanResult> result = m_scanEngine->Scan(request);
-    // Map the result to CItem
-    std::unique_ptr<CItem> rootItem = m_mapper->Map(*result);
-    // TODO: Update the UI or document model with the rootItem
+IScanEngine* CDirStatDoc::GetScanEngine() const {
+    return m_scanEngine.get();
 }
 
 CDirStatDoc::~CDirStatDoc()
@@ -1889,19 +1883,12 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
         }
 
         // Create subordinate threads if there is work to do
-        std::unordered_map<std::wstring, FinderNtfsContext> queueContextNtfs;
-        std::unordered_map<std::wstring, FinderBasicContext> queueContextBasic;
         for (auto& queue : m_queues)
         {
-            queueContextNtfs.try_emplace(queue.first);
-            queueContextBasic.try_emplace(queue.first);
-
             auto* queuePtr = &queue.second;
-            auto* ntfsCtx = &queueContextNtfs[queue.first];
-            auto* basicCtx = &queueContextBasic[queue.first];
-            queue.second.StartThreads(COptions::ScanningThreads, [queuePtr, ntfsCtx, basicCtx]()
+            queue.second.StartThreads(COptions::ScanningThreads, [queuePtr]()
             {
-                CItem::ScanItems(queuePtr, *ntfsCtx, *basicCtx);
+                CItem::ScanItems(queuePtr);
             });
         }
 

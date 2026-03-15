@@ -899,15 +899,40 @@ void CItem::UpdateStatsFromDisk()
     }
 }
 
-void CItem::ScanItems(
-    BlockingQueue<CItem*>* queue,
-    FinderNtfsContext& contextNtfs,
-    FinderBasicContext& contextBasic)
+void CItem::ScanItems(BlockingQueue<CItem*>* queue)
+    
 {
-    CItemDiscoverySink sink(*queue);
-    ScanScheduler scheduler;
+    auto* doc = CDirStatDoc::Get();
+    ASSERT(doc != nullptr);
+    if (doc == nullptr || queue == nullptr)
+        return;
 
-    scheduler.Run(*queue, contextNtfs, contextBasic, sink);
+    CItemDiscoverySink sink(*doc);
+    std::vector<ScanTask> rootTasks;
+
+    while (true)
+    {
+        auto itemOpt = queue->Pop();
+        if (!itemOpt.has_value())
+            break;
+
+        CItem* item = itemOpt.value();
+        if (item == nullptr)
+            continue;
+
+        rootTasks.push_back(ScanTask{ item->GetPath() });
+    }
+
+    if (rootTasks.empty())
+        return;
+
+
+    IScanEngine* engine = doc->GetScanEngine();
+    ASSERT(engine != nullptr);
+    if (engine == nullptr)
+        return;
+
+    engine->Scan(rootTasks, sink);
 }
 
 void CItem::ScanItemsFinalize(CItem* item)
