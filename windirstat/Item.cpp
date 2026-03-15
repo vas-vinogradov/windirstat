@@ -816,7 +816,7 @@ void CItem::UpwardAddReadJobs(const ULONG count) noexcept
     for (auto p = this; p != nullptr; p = p->GetParent())
     {
         if (p->IsTypeOrFlag(IT_FILE)) continue;
-        p->m_folderInfo->m_jobs += count;
+        p->m_folderInfo->m_jobs.fetch_add(count);
     }
 }
 
@@ -828,6 +828,10 @@ void CItem::UpwardSubtractReadJobs(const ULONG count) noexcept
         const ULONG previous = p->m_folderInfo->m_jobs.fetch_sub(count);
         if (previous >= count && previous - count == 0)
         {
+            TRACE(L"Read jobs for item '%ls' completed previous=%u count=%u. Marking done.\n",
+                p->GetName().c_str(),
+                previous,
+                count);
             p->SetDone();
         }
     }

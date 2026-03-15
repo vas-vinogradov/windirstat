@@ -71,8 +71,16 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
     for (const auto& dir : batch.directories)
     {
         item->UpwardAddFolders(1);
-
-        if (CItem* newitem = item->AddDirectoryFromDiscovery(dir); newitem->GetReadJobs() > 0)
+        CItem* newitem;
+        newitem = item->AddDirectoryFromDiscovery(dir);
+        if (newitem == nullptr)
+        {
+            continue;
+        }
+        
+        TRACE("Discovered directory: %s (read jobs: %d)\n", dir.fullPath.c_str(), newitem->GetReadJobs());
+        
+        if (newitem->GetReadJobs() > 0)
         {
             childTasks.push_back(ScanTask{ newitem->GetPath() });
         }
