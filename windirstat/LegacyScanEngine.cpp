@@ -39,9 +39,6 @@ void LegacyScanEngine::Scan(
 
         for (const auto& childTask : childTasks)
             queue.Push(childTask);
-
-        // Critical missing completion boundary from old scan loop
-        sink.CompleteTask(scannedPath);
     }
 }
 

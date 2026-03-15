@@ -96,7 +96,7 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
         CFileTopControl::Get()->ProcessTop(newitem);
     }
 
-    item->UpwardDrivePacman();
+    CompleteTask(batch.scannedPath);
 
     return childTasks;
 }
