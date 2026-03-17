@@ -86,12 +86,14 @@ public:
     static CDirStatDoc* Get() { return s_singleton; }
     void StartScan(const std::wstring& rootPath);
     IScanEngine* GetScanEngine() const;
+    ULONGLONG m_scanStart = 0;
 
 private:
     std::unique_ptr<IScanEngine> m_scanEngine;
     std::unique_ptr<ScanResultToCItemMapper> m_mapper;
     // Helper to initialize the scan engine
     void InitializeScanEngine();
+    
 
 protected:
     CDirStatDoc(); // Created by MFC only

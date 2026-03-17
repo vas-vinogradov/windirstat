@@ -190,11 +190,6 @@ void CItem::AddChild(CItem* child, const bool addOnly)
             std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
             childCount = m_folderInfo->m_children.size();
 
-            TRACE(
-                L"[SCAN] ADDCHILD DIRECT PUSH parent='%ls' child='%ls' size_before=%zu\n",
-                GetPath().c_str(),
-                child->GetName().c_str(),
-                childCount);
             m_folderInfo->m_children.push_back(child);
         }
     }
@@ -821,13 +816,7 @@ std::wstring CItem::GetPathWithoutSlash() const
 
 void CItem::SetDone(const wchar_t* source)
 {
-    TRACE(
-        L"[SCAN] SETDONE source=%ls item='%ls' children=%zu jobs=%u\n",
-        source,
-        GetPath().c_str(),
-        static_cast<size_t>(GetTreeListChildCount()),
-        GetReadJobs());
-    
+      
     if (IsDone())
     {
         return;
@@ -842,10 +831,8 @@ void CItem::SetDone(const wchar_t* source)
     // Sort and set finish time
     if (!IsLeaf())
     {
-        TRACE(L"[SCAN] SETDONE BEFORE SORT '%ls'\n", GetPath().c_str());
         COptions::TreeMapUseLogical ? SortItemsBySizeLogical() : SortItemsBySizePhysical();
         m_folderInfo->m_tfinish = static_cast<ULONG>(GetTickCount64() / 1000ull);
-        TRACE(L"[SCAN] SETDONE AFTER SORT '%ls'\n", GetPath().c_str());
     }
 
     // Mark as done just so other functions do not sort at the same time
@@ -908,15 +895,6 @@ void CItem::UpwardSubtractReadJobs(const ULONG count) noexcept
     for (auto p = this; p != nullptr; p = p->GetParent())
     {
         const ULONG previous = p->m_folderInfo->m_jobs.fetch_sub(count);
-        if (p->GetParent() == nullptr) // root only
-        {
-            TRACE(
-                L"[SCAN] ROOT SUBJOBS prev=%u dec=%u now=%u path='%ls'\n",
-                previous,
-                count,
-                previous - count,
-                p->GetPath().c_str());
-        }
         if (previous >= count && previous - count == 0)
         {
             p->SetDone(L"job_zero");

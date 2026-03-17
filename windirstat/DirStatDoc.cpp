@@ -1767,6 +1767,9 @@ void CDirStatDoc::OnContextMenuExplore(UINT nID)
 
 void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
 {
+    m_scanStart = GetTickCount64();
+    TRACE(L"[PERF] scan start\n");
+    
     // Stop any previous executions
     CWaitCursor wc;
     StopScanningEngine();
@@ -1953,6 +1956,8 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
             });
             return;
         }
+
+        TRACE(L"[PERF] finalize reached %llu ms\n", GetTickCount64() - m_scanStart);
 
         // Sorting and other finalization tasks
         CItem::ScanItemsFinalize(GetRootItem());

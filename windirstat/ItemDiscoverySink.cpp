@@ -79,8 +79,6 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
             continue;
         }
         
-        TRACE("Discovered directory: %s (read jobs: %d)\n", dir.fullPath.c_str(), newitem->GetReadJobs());
-        
         if (result.shouldQueue)
         {
             childTasks.push_back(ScanTask{ newitem->GetPath() });
