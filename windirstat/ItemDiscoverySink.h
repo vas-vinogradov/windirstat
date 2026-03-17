@@ -3,9 +3,8 @@
 #include <string>
 #include <vector>
 #include "IDiscoverySink.h"
-
-class CDirStatDoc;
-class CItem;
+#include "Item.h"
+#include "DirStatDoc.h"
 
 class CItemDiscoverySink : public IDiscoverySink
 {

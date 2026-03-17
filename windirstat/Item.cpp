@@ -86,7 +86,13 @@ CItem::~CItem()
 {
     if (m_folderInfo != nullptr)
     {
-        for (const auto& child : m_folderInfo->m_children)
+        std::vector<CItem*> children;
+        {
+            std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+            children = std::move(m_folderInfo->m_children);
+        }
+
+        for (const auto& child : children)
         {
             delete child;
         }
@@ -95,10 +101,38 @@ CItem::~CItem()
 
 // --- Hierarchy ---
 
-const std::vector<CItem*>& CItem::GetChildren() const noexcept
+int CItem::GetTreeListChildCount() const noexcept
+{
+    if (m_folderInfo == nullptr)
+    {
+        return 0;
+    }
+
+    std::shared_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+    return static_cast<int>(m_folderInfo->m_children.size());
+}
+
+CTreeListItem* CItem::GetTreeListChild(const int i) const noexcept
+{
+    return TmiGetChild(i);
+}
+
+std::vector<CItem*> CItem::GetChildren() const
 {
     ASSERT(m_folderInfo != nullptr);
+    std::shared_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
     return m_folderInfo->m_children;
+}
+
+bool CItem::HasChildren() const noexcept
+{
+    if (m_folderInfo == nullptr)
+    {
+        return false;
+    }
+
+    std::shared_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+    return !m_folderInfo->m_children.empty();
 }
 
 CItem* CItem::GetParent() const noexcept
@@ -143,11 +177,27 @@ void CItem::AddChild(CItem* child, const bool addOnly)
         CMainFrame::Get()->InvokeInMessageThread([this, child]
         {
             // Add child in UI thread since UI thread immediately use it
-            m_folderInfo->m_children.push_back(child);
+            {
+                std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+                m_folderInfo->m_children.push_back(child);
+            }
             CFileTreeControl::Get()->OnChildAdded(this, child);
         });
     }
-    else m_folderInfo->m_children.push_back(child);
+    else {
+        size_t childCount = 0;
+        {
+            std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+            childCount = m_folderInfo->m_children.size();
+
+            TRACE(
+                L"[SCAN] ADDCHILD DIRECT PUSH parent='%ls' child='%ls' size_before=%zu\n",
+                GetPath().c_str(),
+                child->GetName().c_str(),
+                childCount);
+            m_folderInfo->m_children.push_back(child);
+        }
+    }
 }
 
 void CItem::RemoveChild(CItem* child)
@@ -160,10 +210,13 @@ void CItem::RemoveChild(CItem* child)
         });
     }
 
-    auto& children = m_folderInfo->m_children;
-    if (const auto it = std::ranges::find(children, child); it != children.end())
     {
-        children.erase(it);
+        std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+        auto& children = m_folderInfo->m_children;
+        if (const auto it = std::ranges::find(children, child); it != children.end())
+        {
+            children.erase(it);
+        }
     }
 
     // Check if this child is a hardlink
@@ -246,11 +299,16 @@ void CItem::RemoveAllChildren()
         CFileTreeControl::Get()->OnRemovingAllChildren(this);
     });
 
-    for (const auto& child : m_folderInfo->m_children)
+    std::vector<CItem*> children;
+    {
+        std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+        children = std::move(m_folderInfo->m_children);
+    }
+
+    for (const auto& child : children)
     {
         delete child;
     }
-    m_folderInfo->m_children.clear();
 }
 
 CItem* CItem::AddDirectory(const Finder& finder)
@@ -287,7 +345,7 @@ CItem* CItem::AddFile(const Finder& finder)
     return child;
 }
 
-CItem* CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir) {
+CItem::DiscoveryDirectoryResult CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir) {
     const bool follow = !dir.isProtectedReparsePoint &&
         CDirStatApp::Get()->IsFollowingAllowed(dir.reparseTag);
     auto* child = new CItem(IT_DIRECTORY, dir.name);
@@ -301,9 +359,14 @@ CItem* CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir) {
     if (dir.isOffVolume && follow) {
         child->SetFlag(ITF_BASIC);
     }
+    if (follow)
+    {
+        child->SetParent(this);   // or direct parent assignment equivalent
+        child->UpwardAddReadJobs(1);
+    }
+
     AddChild(child);
-    child->UpwardAddReadJobs(follow ? 1 : 0);
-    return child;
+    return { child, follow };
 }
 
 CItem* CItem::AddFileFromDiscovery(const DiscoveredFile& file) {
@@ -605,8 +668,9 @@ void CItem::UpwardRecalcLastChange()
     // ignore current object in recalculation 
     for (auto p = GetParent(); p != nullptr; p = p->GetParent())
     {
+        const auto children = p->GetChildren();
         const auto newMax = (std::ranges::max)(
-            p->GetChildren() | std::views::transform(&CItem::m_lastChange));
+            children | std::views::transform(&CItem::m_lastChange));
 
         if (p->m_lastChange == newMax) break;
         p->m_lastChange = newMax;
@@ -702,9 +766,10 @@ CItem* CItem::FindItemByPath(const std::wstring& path) const
         if (current->IsLeaf()) return nullptr;
 
         // Find the matching child using GetNameView for comparison
-        auto it = std::ranges::find_if(current->GetChildren(),
+        const auto children = current->GetChildren();
+        auto it = std::ranges::find_if(children,
             [&](const CItem* child) { return child->GetNameView() == components[i]; });
-        if (it == current->GetChildren().end()) return nullptr;
+        if (it == children.end()) return nullptr;
         current = *it;
     }
 
@@ -754,8 +819,15 @@ std::wstring CItem::GetPathWithoutSlash() const
 
 // --- Scanning & Done State ---
 
-void CItem::SetDone()
+void CItem::SetDone(const wchar_t* source)
 {
+    TRACE(
+        L"[SCAN] SETDONE source=%ls item='%ls' children=%zu jobs=%u\n",
+        source,
+        GetPath().c_str(),
+        static_cast<size_t>(GetTreeListChildCount()),
+        GetReadJobs());
+    
     if (IsDone())
     {
         return;
@@ -770,8 +842,10 @@ void CItem::SetDone()
     // Sort and set finish time
     if (!IsLeaf())
     {
+        TRACE(L"[SCAN] SETDONE BEFORE SORT '%ls'\n", GetPath().c_str());
         COptions::TreeMapUseLogical ? SortItemsBySizeLogical() : SortItemsBySizePhysical();
         m_folderInfo->m_tfinish = static_cast<ULONG>(GetTickCount64() / 1000ull);
+        TRACE(L"[SCAN] SETDONE AFTER SORT '%ls'\n", GetPath().c_str());
     }
 
     // Mark as done just so other functions do not sort at the same time
@@ -816,8 +890,16 @@ void CItem::UpwardAddReadJobs(const ULONG count) noexcept
     for (auto p = this; p != nullptr; p = p->GetParent())
     {
         if (p->IsTypeOrFlag(IT_FILE)) continue;
+        p->ClearDone();
         p->m_folderInfo->m_jobs.fetch_add(count);
     }
+}
+
+void CItem::ClearDone() noexcept
+{
+    using U = std::underlying_type_t<ITEMTYPE>;
+    m_type = static_cast<ITEMTYPE>(
+        static_cast<U>(m_type) & ~static_cast<U>(ITF_DONE));
 }
 
 void CItem::UpwardSubtractReadJobs(const ULONG count) noexcept
@@ -826,13 +908,18 @@ void CItem::UpwardSubtractReadJobs(const ULONG count) noexcept
     for (auto p = this; p != nullptr; p = p->GetParent())
     {
         const ULONG previous = p->m_folderInfo->m_jobs.fetch_sub(count);
+        if (p->GetParent() == nullptr) // root only
+        {
+            TRACE(
+                L"[SCAN] ROOT SUBJOBS prev=%u dec=%u now=%u path='%ls'\n",
+                previous,
+                count,
+                previous - count,
+                p->GetPath().c_str());
+        }
         if (previous >= count && previous - count == 0)
         {
-            TRACE(L"Read jobs for item '%ls' completed previous=%u count=%u. Marking done.\n",
-                p->GetName().c_str(),
-                previous,
-                count);
-            p->SetDone();
+            p->SetDone(L"job_zero");
         }
     }
 }
@@ -856,6 +943,7 @@ void CItem::SortItemsBySizePhysical() const
     if (IsLeaf()) return;
 
     // sort by size for proper treemap rendering
+    std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
     m_folderInfo->m_children.shrink_to_fit();
     std::ranges::sort(m_folderInfo->m_children, std::ranges::greater{}, &CItem::GetSizePhysical);
 }
@@ -865,6 +953,7 @@ void CItem::SortItemsBySizeLogical() const
     if (IsLeaf()) return;
 
     // sort by size for proper treemap rendering
+    std::unique_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
     m_folderInfo->m_children.shrink_to_fit();
     std::ranges::sort(m_folderInfo->m_children, std::ranges::greater{}, &CItem::GetSizeLogical);
 }
@@ -912,7 +1001,14 @@ void CItem::ScanItems(BlockingQueue<CItem*>* queue)
         return;
 
     CItemDiscoverySink sink(*doc);
-    std::vector<ScanTask> rootTasks;
+    IScanEngine* engine = doc->GetScanEngine();
+    ASSERT(engine != nullptr);
+    if (engine == nullptr)
+        return;
+
+    // Temporary serialization while the legacy scan engine still shares
+    // mutable context across worker threads.
+    static std::mutex engineScanMutex;
 
     while (true)
     {
@@ -924,19 +1020,9 @@ void CItem::ScanItems(BlockingQueue<CItem*>* queue)
         if (item == nullptr)
             continue;
 
-        rootTasks.push_back(ScanTask{ item->GetPath() });
+        std::scoped_lock lock(engineScanMutex);
+        engine->Scan({ ScanTask{ item->GetPath() } }, sink);
     }
-
-    if (rootTasks.empty())
-        return;
-
-
-    IScanEngine* engine = doc->GetScanEngine();
-    ASSERT(engine != nullptr);
-    if (engine == nullptr)
-        return;
-
-    engine->Scan(rootTasks, sink);
 }
 
 void CItem::ScanItemsFinalize(CItem* item)
@@ -947,7 +1033,7 @@ void CItem::ScanItemsFinalize(CItem* item)
     {
         const auto & qitem = queue.back();
         queue.pop_back();
-        qitem->SetDone();
+        qitem->SetDone(L"finalize");
         if (qitem->m_folderInfo == nullptr) continue;
         for (const auto& child : qitem->GetChildren())
         {

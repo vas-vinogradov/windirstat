@@ -35,10 +35,18 @@ void LegacyScanEngine::Scan(
         DiscoveryBatch batch = m_extractor.Extract(request);
         batch.scannedPath = scannedPath;
 
+        // IMPORTANT:
+        // Complete the current task only after all child tasks discovered from this batch
+        // have been published to the queue. Calling CompleteTask() inside Apply()
+        // can let parent m_jobs reach zero before child work is published.
         auto childTasks = sink.Apply(batch);
+
+
 
         for (const auto& childTask : childTasks)
             queue.Push(childTask);
+
+        sink.CompleteTask(batch.scannedPath);
     }
 }
 

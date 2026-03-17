@@ -9,3 +9,13 @@
 /.git/
 .vs/
 windirstat/res/lang_combined.txt
+windirstat/Build/
+windirstat/intermediate/
+*.exe
+*.pdb
+*.obj
+*.ilk
+*.pch
+*.tlog
+*.log
+*.lastbuildstate

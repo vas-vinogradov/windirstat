@@ -40,14 +40,15 @@ CItem* CItemDiscoverySink::FindItemByPath(const std::wstring& path) const
         if (current->IsLeaf())
             return nullptr;
 
+        const auto children = current->GetChildren();
         auto it = std::ranges::find_if(
-            current->GetChildren(),
+            children,
             [&](const CItem* child)
             {
                 return child->GetNameView() == component;
             });
 
-        if (it == current->GetChildren().end())
+        if (it == children.end())
             return nullptr;
 
         current = *it;
@@ -71,8 +72,8 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
     for (const auto& dir : batch.directories)
     {
         item->UpwardAddFolders(1);
-        CItem* newitem;
-        newitem = item->AddDirectoryFromDiscovery(dir);
+        const auto result = item->AddDirectoryFromDiscovery(dir);
+        CItem* newitem = result.item;
         if (newitem == nullptr)
         {
             continue;
@@ -80,7 +81,7 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
         
         TRACE("Discovered directory: %s (read jobs: %d)\n", dir.fullPath.c_str(), newitem->GetReadJobs());
         
-        if (newitem->GetReadJobs() > 0)
+        if (result.shouldQueue)
         {
             childTasks.push_back(ScanTask{ newitem->GetPath() });
         }
@@ -95,8 +96,6 @@ std::vector<ScanTask> CItemDiscoverySink::Apply(const DiscoveryBatch& batch)
         // CFileDupeControl::Get()->ProcessDuplicate(newitem, &m_queue);
         CFileTopControl::Get()->ProcessTop(newitem);
     }
-
-    CompleteTask(batch.scannedPath);
 
     return childTasks;
 }

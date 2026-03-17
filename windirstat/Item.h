@@ -18,6 +18,7 @@
 #pragma once
 
 #include "pch.h"
+#include <shared_mutex>
 #include "TreeListControl.h"
 #include "Finder.h"
 
@@ -137,16 +138,16 @@ public:
     std::wstring GetText(int subitem) const override;
     COLORREF GetItemTextColor() const override;
     int CompareSibling(const CTreeListItem* tlib, int subitem) const override;
-    int GetTreeListChildCount() const noexcept override { return IsLeaf() ? 0 : static_cast<int>(GetChildren().size()); }
-    CTreeListItem* GetTreeListChild(const int i) const noexcept override { return GetChildren()[i]; }
+    int GetTreeListChildCount() const noexcept override;
+    CTreeListItem* GetTreeListChild(int i) const noexcept override;
     HICON GetIcon() override;
     void DrawAdditionalState(CDC* pdc, const CRect& rcLabel) const override;
     CItem* GetLinkedItem() noexcept override;
 
     // Hierarchy / Navigation
-    const std::vector<CItem*>& GetChildren() const noexcept;
+    std::vector<CItem*> GetChildren() const;
     bool IsLeaf() const noexcept { return m_folderInfo == nullptr; }
-    bool HasChildren() const noexcept { return m_folderInfo != nullptr && !m_folderInfo->m_children.empty(); }
+    bool HasChildren() const noexcept;
     CItem* GetParent() const noexcept;
     CItem* GetParentDrive() const noexcept;
     CItem* GetVolumeRoot() const noexcept;
@@ -202,7 +203,8 @@ public:
     CItem* FindItemByPath(const std::wstring& path) const;
 
     // Scanning & Done State
-    void SetDone();
+    void SetDone(const wchar_t* source = L"direct");
+    void ClearDone() noexcept;
     bool IsDone() const noexcept { return IsTypeOrFlag(ITF_DONE); }
     void UpwardSetDone() noexcept;
     void UpwardSetUndone() noexcept;
@@ -225,7 +227,7 @@ public:
     void TmiSetRectangle(const CRect& rc) noexcept { tmiRect = rc; }
     COLORREF TmiGetGraphColor() const { return GetGraphColor(); }
     int TmiGetChildCount() const noexcept;
-    CItem* TmiGetChild(const int c) const noexcept { return m_folderInfo->m_children[c]; }
+    CItem* TmiGetChild(int c) const noexcept;
     ULONGLONG TmiGetSize() const noexcept;
 
     // Drive/Volume Specific
@@ -245,8 +247,14 @@ public:
     void RemoveUnknownItem();
     void UpwardDrivePacman();
 
+    struct DiscoveryDirectoryResult
+    {
+        CItem* item;
+        bool shouldQueue;
+    };
+
     // Adds a directory using the DiscoveredDirectory DTO
-    CItem* AddDirectoryFromDiscovery(const DiscoveredDirectory& dir);
+    DiscoveryDirectoryResult AddDirectoryFromDiscovery(const DiscoveredDirectory& dir);
     // Adds a file using the DiscoveredFile DTO
     CItem* AddFileFromDiscovery(const DiscoveredFile& file);
     // Existing Finder-based overloads (unchanged)
@@ -300,6 +308,7 @@ private:
     using CHILDINFO = struct CHILDINFO
     {
         std::vector<CItem*> m_children;
+        mutable std::shared_mutex m_childrenMutex;
         std::atomic<ULONG> m_tstart = 0;  // time this node started enumerating
         std::atomic<ULONG> m_tfinish = 0; // time this node finished enumerating
         std::atomic<ULONG> m_files = 0;   // # Files in subtree

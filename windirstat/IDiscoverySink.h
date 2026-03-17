@@ -10,9 +10,9 @@ class IDiscoverySink
 public:
     virtual ~IDiscoverySink() = default;
 
+    // Applies the discovered batch to the internal state and returns new scan tasks for discovered directories.
     virtual std::vector<ScanTask> Apply(const DiscoveryBatch& batch) = 0;
 
-    // Called by the scan engine after one ScanTask has been fully processed
-    // (batch extracted, applied, and child tasks queued).
+    //Is the only way to complete jobs.
     virtual void CompleteTask(const std::wstring& path) = 0;
 };

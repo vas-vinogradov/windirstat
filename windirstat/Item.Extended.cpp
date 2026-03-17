@@ -372,7 +372,22 @@ CItem* CItem::GetLinkedItem() noexcept
 int CItem::TmiGetChildCount() const noexcept
 {
     if (m_folderInfo == nullptr || IsTypeOrFlag(IT_HLINKS_IDX)) return 0;
+    std::shared_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
     return static_cast<int>(m_folderInfo->m_children.size());
+}
+
+CItem* CItem::TmiGetChild(const int c) const noexcept
+{
+    if (m_folderInfo == nullptr || IsTypeOrFlag(IT_HLINKS_IDX)) return nullptr;
+
+    std::shared_lock<std::shared_mutex> lock(m_folderInfo->m_childrenMutex);
+    ASSERT(c >= 0 && static_cast<size_t>(c) < m_folderInfo->m_children.size());
+    if (c < 0 || static_cast<size_t>(c) >= m_folderInfo->m_children.size())
+    {
+        return nullptr;
+    }
+
+    return m_folderInfo->m_children[static_cast<size_t>(c)];
 }
 
 ULONGLONG CItem::TmiGetSize() const noexcept

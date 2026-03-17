@@ -486,8 +486,12 @@ void CDirStatDoc::DeletePhysicalItems(const std::vector<CItem*>& items, const bo
     std::vector itemsToDelete{ items };
     if (emptyOnly)
     {
-        auto childrenView = items | std::views::transform(&CItem::GetChildren) | std::views::join;
-        itemsToDelete.assign(childrenView.begin(), childrenView.end());
+        itemsToDelete.clear();
+        for (const auto& item : items)
+        {
+            const auto children = item->GetChildren();
+            itemsToDelete.insert(itemsToDelete.end(), children.begin(), children.end());
+        }
     }
 
     // Calculate total item count for progress tracking
