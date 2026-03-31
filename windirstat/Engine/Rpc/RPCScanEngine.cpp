@@ -32,6 +32,7 @@ void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observe
     m_outstandingWorkItems.store(1, std::memory_order_release);
     m_requestInputClosed.store(false, std::memory_order_release);
     m_cancelRequested.store(false, std::memory_order_release);
+    m_terminalResolved.store(false, std::memory_order_release);
     m_running.store(true, std::memory_order_release);
 
     RpcStartScanRequest startRequest{};
@@ -41,15 +42,7 @@ void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observe
     if (m_transportClient != nullptr && m_transportClient->SendStartScan(startRequest))
         return;
 
-    ResetRequestLifecycle();
-
-    ScanError error{};
-    error.requestId = requestId;
-    error.path = request.rootPath;
-    error.message = L"Failed to send StartScan over RPC transport.";
-    error.errorCode = ERROR_BROKEN_PIPE;
-    observer.OnError(error);
-    observer.OnCanceled(requestId, ScanTerminalReason::EngineInterrupted);
+    FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send StartScan over RPC transport.");
 }
 
 void RPCScanEngine::Enqueue(const ScanRequest& request)
@@ -80,6 +73,7 @@ void RPCScanEngine::Enqueue(const ScanRequest& request)
     }
 
     m_outstandingWorkItems.fetch_sub(1, std::memory_order_acq_rel);
+    FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send Enqueue over RPC transport.");
 }
 
 void RPCScanEngine::Cancel(const ScanTerminalReason reason)
@@ -95,7 +89,12 @@ void RPCScanEngine::Cancel(const ScanTerminalReason reason)
     cancelRequest.reason = reason;
 
     if (m_transportClient != nullptr)
-        (void)m_transportClient->SendCancelScan(cancelRequest);
+    {
+        if (m_transportClient->SendCancelScan(cancelRequest))
+            return;
+    }
+
+    FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send CancelScan over RPC transport.");
 }
 
 void RPCScanEngine::Suspend()
@@ -118,7 +117,7 @@ std::uint64_t RPCScanEngine::GetActiveRequestId() const
 
 void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& event)
 {
-    if (!IsCurrentRequest(event.requestId))
+    if (!IsCurrentRequest(event.requestId) || m_terminalResolved.load(std::memory_order_acquire))
         return;
 
     IScanObserver* const observer = GetObserver();
@@ -150,6 +149,9 @@ void RPCScanEngine::OnRemoteScanCompleted(const RpcScanCompletedEvent& event)
     if (!IsCurrentRequest(event.requestId))
         return;
 
+    if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
+        return;
+
     ResetRequestLifecycle();
 
     IScanObserver* const observer = GetObserver();
@@ -162,6 +164,9 @@ void RPCScanEngine::OnRemoteScanCanceled(const RpcScanCanceledEvent& event)
     if (!IsCurrentRequest(event.requestId))
         return;
 
+    if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
+        return;
+
     ResetRequestLifecycle();
 
     IScanObserver* const observer = GetObserver();
@@ -172,6 +177,9 @@ void RPCScanEngine::OnRemoteScanCanceled(const RpcScanCanceledEvent& event)
 void RPCScanEngine::OnRemoteScanFailed(const RpcScanFailedEvent& event)
 {
     if (!IsCurrentRequest(event.requestId))
+        return;
+
+    if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
         return;
 
     ResetRequestLifecycle();
@@ -187,6 +195,11 @@ void RPCScanEngine::OnRemoteScanFailed(const RpcScanFailedEvent& event)
     error.errorCode = event.errorCode;
     observer->OnError(error);
     observer->OnCanceled(event.requestId, ScanTerminalReason::EngineInterrupted);
+}
+
+void RPCScanEngine::OnTransportFailure(const unsigned long errorCode, const std::wstring& message)
+{
+    FailActiveRequestForTransport(errorCode, message);
 }
 
 bool RPCScanEngine::IsCurrentRequest(const std::uint64_t requestId) const
@@ -219,5 +232,34 @@ void RPCScanEngine::TryCloseRequestInput(const std::uint64_t requestId)
     RpcCloseRequestInput closeRequest{};
     closeRequest.requestId = requestId;
     if (m_transportClient != nullptr)
-        (void)m_transportClient->SendCloseRequestInput(closeRequest);
+    {
+        if (m_transportClient->SendCloseRequestInput(closeRequest))
+            return;
+    }
+
+    FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send CloseRequestInput over RPC transport.");
+}
+
+void RPCScanEngine::FailActiveRequestForTransport(const unsigned long errorCode, const std::wstring& message)
+{
+    const std::uint64_t requestId = m_activeRequestId.load(std::memory_order_acquire);
+    if (requestId == 0)
+        return;
+
+    if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
+        return;
+
+    ResetRequestLifecycle();
+
+    IScanObserver* const observer = GetObserver();
+    if (observer == nullptr)
+        return;
+
+    ScanError error{};
+    error.requestId = requestId;
+    error.path = L"RPC transport";
+    error.message = message;
+    error.errorCode = errorCode;
+    observer->OnError(error);
+    observer->OnCanceled(requestId, ScanTerminalReason::EngineInterrupted);
 }

@@ -10,6 +10,7 @@ public:
     virtual void OnRemoteScanCompleted(const RpcScanCompletedEvent& event) = 0;
     virtual void OnRemoteScanCanceled(const RpcScanCanceledEvent& event) = 0;
     virtual void OnRemoteScanFailed(const RpcScanFailedEvent& event) = 0;
+    virtual void OnTransportFailure(unsigned long errorCode, const std::wstring& message) = 0;
 };
 
 class IRpcTransportClient

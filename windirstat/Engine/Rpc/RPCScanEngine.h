@@ -28,9 +28,11 @@ private:
     void OnRemoteScanCompleted(const RpcScanCompletedEvent& event) override;
     void OnRemoteScanCanceled(const RpcScanCanceledEvent& event) override;
     void OnRemoteScanFailed(const RpcScanFailedEvent& event) override;
+    void OnTransportFailure(unsigned long errorCode, const std::wstring& message) override;
 
     void ResetRequestLifecycle();
     void TryCloseRequestInput(std::uint64_t requestId);
+    void FailActiveRequestForTransport(unsigned long errorCode, const std::wstring& message);
     bool IsCurrentRequest(std::uint64_t requestId) const;
     IScanObserver* GetObserver() const;
 
@@ -42,5 +44,6 @@ private:
     std::atomic_uint32_t m_outstandingWorkItems = 0;
     std::atomic_bool m_requestInputClosed = false;
     std::atomic_bool m_cancelRequested = false;
+    std::atomic_bool m_terminalResolved = false;
     std::atomic_bool m_running = false;
 };

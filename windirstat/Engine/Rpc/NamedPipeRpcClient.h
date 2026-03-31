@@ -26,6 +26,7 @@ private:
     bool SendJsonMessage(const std::string& json);
     std::optional<std::string> ReadJsonMessage();
     void ReaderLoop();
+    void NotifyTransportFailure(unsigned long errorCode, const std::wstring& message);
     void ClosePipe();
     void StopRemoteHost();
     void DispatchEvent(const RpcEventMessage& event);
@@ -39,5 +40,7 @@ private:
     mutable std::mutex m_handlerMutex;
     IRpcTransportEventHandler* m_handler = nullptr;
     std::optional<std::jthread> m_readerThread;
+    std::atomic_bool m_shutdownRequested = false;
     std::atomic_bool m_readerRunning = false;
+    std::atomic_bool m_transportFailureNotified = false;
 };

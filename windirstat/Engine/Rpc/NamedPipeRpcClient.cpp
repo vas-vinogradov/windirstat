@@ -48,6 +48,7 @@ NamedPipeRpcClient::NamedPipeRpcClient()
 
 NamedPipeRpcClient::~NamedPipeRpcClient()
 {
+    m_shutdownRequested.store(true, std::memory_order_release);
     m_readerRunning.store(false, std::memory_order_release);
     ClosePipe();
 
@@ -90,11 +91,17 @@ bool NamedPipeRpcClient::EnsureConnected()
     if (m_pipe != INVALID_HANDLE_VALUE)
         return true;
 
+    m_transportFailureNotified.store(false, std::memory_order_release);
+
     if (!StartRemoteHost())
+    {
+        NotifyTransportFailure(GetLastError(), L"Failed to start remote RPC host.");
         return false;
+    }
 
     if (!ConnectPipe())
     {
+        NotifyTransportFailure(GetLastError(), L"Failed to connect to remote RPC pipe.");
         StopRemoteHost();
         return false;
     }
@@ -149,29 +156,67 @@ bool NamedPipeRpcClient::ConnectPipe()
 
 bool NamedPipeRpcClient::SendJsonMessage(const std::string& json)
 {
+    DWORD errorCode = ERROR_SUCCESS;
     std::scoped_lock lock(m_ioMutex);
     if (m_pipe == INVALID_HANDLE_VALUE)
         return false;
 
     const DWORD length = static_cast<DWORD>(json.size());
-    return WriteAll(m_pipe, &length, sizeof(length)) && (length == 0 || WriteAll(m_pipe, json.data(), length));
+    if (!WriteAll(m_pipe, &length, sizeof(length)) || (length != 0 && !WriteAll(m_pipe, json.data(), length)))
+    {
+        errorCode = GetLastError();
+    }
+    else
+    {
+        return true;
+    }
+
+    if (m_pipe != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(m_pipe);
+        m_pipe = INVALID_HANDLE_VALUE;
+    }
+
+    NotifyTransportFailure(errorCode, L"Failed to write RPC message to named pipe.");
+    return false;
 }
 
 std::optional<std::string> NamedPipeRpcClient::ReadJsonMessage()
 {
+    DWORD errorCode = ERROR_SUCCESS;
+    std::wstring errorMessage;
     std::scoped_lock lock(m_ioMutex);
     if (m_pipe == INVALID_HANDLE_VALUE)
         return std::nullopt;
 
     DWORD length = 0;
     if (!ReadAll(m_pipe, &length, sizeof(length)))
-        return std::nullopt;
+    {
+        errorCode = GetLastError();
+        errorMessage = L"Failed to read RPC message header from named pipe.";
+    }
+    else
+    {
+        std::string json(length, '\0');
+        if (length != 0 && !ReadAll(m_pipe, json.data(), length))
+        {
+            errorCode = GetLastError();
+            errorMessage = L"Failed to read RPC message body from named pipe.";
+        }
+        else
+        {
+            return json;
+        }
+    }
 
-    std::string json(length, '\0');
-    if (length != 0 && !ReadAll(m_pipe, json.data(), length))
-        return std::nullopt;
+    if (m_pipe != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(m_pipe);
+        m_pipe = INVALID_HANDLE_VALUE;
+    }
 
-    return json;
+    NotifyTransportFailure(errorCode, errorMessage);
+    return std::nullopt;
 }
 
 void NamedPipeRpcClient::ReaderLoop()
@@ -188,6 +233,26 @@ void NamedPipeRpcClient::ReaderLoop()
     }
 
     m_readerRunning.store(false, std::memory_order_release);
+}
+
+void NamedPipeRpcClient::NotifyTransportFailure(const unsigned long errorCode, const std::wstring& message)
+{
+    StopRemoteHost();
+
+    if (m_shutdownRequested.load(std::memory_order_acquire))
+        return;
+
+    if (m_transportFailureNotified.exchange(true, std::memory_order_acq_rel))
+        return;
+
+    IRpcTransportEventHandler* handler = nullptr;
+    {
+        std::scoped_lock lock(m_handlerMutex);
+        handler = m_handler;
+    }
+
+    if (handler != nullptr)
+        handler->OnTransportFailure(errorCode, message);
 }
 
 void NamedPipeRpcClient::ClosePipe()
