@@ -16,6 +16,7 @@
 //
 
 #include "pch.h"
+#include "RemoteStub/RemoteStubCommandLine.h"
 #include "SelectDrivesDlg.h"
 #include "AboutDlg.h"
 #include "TreeMapView.h"
@@ -296,6 +297,11 @@ public:
 
 BOOL CDirStatApp::InitInstance()
 {
+    if (TryRunRemoteStubFromCommandLine())
+    {
+        return FALSE;
+    }
+
     // Prevent state saving
     m_bSaveState = FALSE;
 

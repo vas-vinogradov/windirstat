@@ -555,6 +555,10 @@
     <ClInclude Include="DiscoveredFile.h" />
     <ClInclude Include="DirectoryProgressBatch.h" />
     <ClInclude Include="DiscoveryBatch.h" />
+    <ClInclude Include="Engine\Rpc\IRpcTransportClient.h" />
+    <ClInclude Include="Engine\Rpc\NamedPipeRpcClient.h" />
+    <ClInclude Include="Engine\Rpc\RPCScanEngine.h" />
+    <ClInclude Include="Engine\Rpc\RpcMessages.h" />
     <ClInclude Include="FileEnumeration.h" />
     <ClInclude Include="FileSystem.h" />
     <ClInclude Include="HelpersInterface.h" />
@@ -565,6 +569,9 @@
     <ClInclude Include="LegacyDiscoveryRequest.h" />
     <ClInclude Include="LegacyScanEngine.h" />
     <ClInclude Include="Pages\PagePrompts.h" />
+    <ClInclude Include="RemoteStub\FakeRemoteScanHost.h" />
+    <ClInclude Include="RemoteStub\NamedPipeRpcServer.h" />
+    <ClInclude Include="RemoteStub\RemoteStubCommandLine.h" />
     <ClInclude Include="ScanEngineFactory.h" />
     <ClInclude Include="ScanNode.h" />
     <ClInclude Include="ScanRequest.h" />
@@ -631,12 +638,18 @@
     <ClCompile Include="Dialogs\ProgressDlg.cpp" />
     <ClCompile Include="DirStatDoc.cpp">
     </ClCompile>
+    <ClCompile Include="Engine\Rpc\NamedPipeRpcClient.cpp" />
+    <ClCompile Include="Engine\Rpc\RPCScanEngine.cpp" />
+    <ClCompile Include="Engine\Rpc\RpcMessages.cpp" />
     <ClCompile Include="FileEnumeration.cpp" />
     <ClCompile Include="FileSystem.cpp" />
     <ClCompile Include="Item.Extended.cpp" />
     <ClCompile Include="LegacyDiscoveryEngine.cpp" />
     <ClCompile Include="LegacyScanEngine.cpp" />
     <ClCompile Include="Pages\PagePrompts.cpp" />
+    <ClCompile Include="RemoteStub\FakeRemoteScanHost.cpp" />
+    <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp" />
+    <ClCompile Include="RemoteStub\RemoteStubCommandLine.cpp" />
     <ClCompile Include="ScanEngineFactory.cpp" />
     <ClCompile Include="ScanResultToCItemMapper.cpp" />
     <ClCompile Include="Views\ControlView.cpp" />

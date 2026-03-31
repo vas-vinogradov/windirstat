@@ -121,6 +121,18 @@
     <Filter Include="Source Files\Engine\Scanning\Discovery">
       <UniqueIdentifier>{0e21dd0c-880b-4f5d-aac1-32d8b95c60c5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Engine\Rpc">
+      <UniqueIdentifier>{b6800da0-9842-4128-a63f-c6f8609f983d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine\Rpc">
+      <UniqueIdentifier>{54888dcc-d6b2-43dd-bac1-429d466307fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\RemoteStub">
+      <UniqueIdentifier>{e6126f64-f638-47ca-ac16-c57266561bf1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\RemoteStub">
+      <UniqueIdentifier>{6e0a220b-e446-4b9c-b18c-549c7f416177}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\windirstat.manifest">
@@ -226,6 +238,15 @@
     </ClInclude>
     <ClInclude Include="Pages\PagePrompts.h">
       <Filter>Header Files\User Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\FakeRemoteScanHost.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\NamedPipeRpcServer.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\RemoteStubCommandLine.h">
+      <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Resource Files\Resources</Filter>
@@ -362,6 +383,18 @@
     <ClInclude Include="DirectoryProgressBatch.h">
       <Filter>Header Files\Contracts</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\Rpc\IRpcTransportClient.h">
+      <Filter>Header Files\Engine\Rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Rpc\NamedPipeRpcClient.h">
+      <Filter>Header Files\Engine\Rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Rpc\RPCScanEngine.h">
+      <Filter>Header Files\Engine\Rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Rpc\RpcMessages.h">
+      <Filter>Header Files\Engine\Rpc</Filter>
+    </ClInclude>
     <ClInclude Include="ScanTask.h">
       <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
     </ClInclude>
@@ -463,6 +496,15 @@
     <ClCompile Include="Pages\PagePrompts.cpp">
       <Filter>Source Files\User Interface\Pages</Filter>
     </ClCompile>
+    <ClCompile Include="RemoteStub\FakeRemoteScanHost.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\RemoteStubCommandLine.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
     <ClCompile Include="Controls\FileWatcherControl.cpp">
       <Filter>Source Files\User Interface\Controls</Filter>
     </ClCompile>
@@ -489,6 +531,15 @@
     </ClCompile>
     <ClCompile Include="DirStatDoc.cpp">
       <Filter>Source Files\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Rpc\NamedPipeRpcClient.cpp">
+      <Filter>Source Files\Engine\Rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Rpc\RPCScanEngine.cpp">
+      <Filter>Source Files\Engine\Rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Rpc\RpcMessages.cpp">
+      <Filter>Source Files\Engine\Rpc</Filter>
     </ClCompile>
     <ClCompile Include="Property.cpp">
       <Filter>Source Files\Core</Filter>
