@@ -16,14 +16,11 @@
 //
 
 #include "pch.h"
+#include "DiscoveredDirectory.h"
+#include "DiscoveredFile.h"
 #include "Item.h"
 #include "FinderBasic.h"
 #include "FinderNtfs.h"
-// Refactoring into legacy scan engine components - these includes will be removed once the legacy engine is fully decoupled from CItem
-#include "ItemDiscoverySink.h"
-#include "LegacyDiscoveryExtractor.h"
-#include "LegacyDiscoveryRequest.h"
-#include "ScanScheduler.h"
 
 // --- Construction / Destruction ---
 
@@ -340,9 +337,7 @@ CItem* CItem::AddFile(const Finder& finder)
     return child;
 }
 
-CItem::DiscoveryDirectoryResult CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir) {
-    const bool follow = !dir.isProtectedReparsePoint &&
-        CDirStatApp::Get()->IsFollowingAllowed(dir.reparseTag);
+CItem* CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir, const bool follow) {
     auto* child = new CItem(IT_DIRECTORY, dir.name);
     child->SetIndex(dir.index);
     child->SetLastChange(dir.lastChange);
@@ -361,7 +356,7 @@ CItem::DiscoveryDirectoryResult CItem::AddDirectoryFromDiscovery(const Discovere
     }
 
     AddChild(child);
-    return { child, follow };
+    return child;
 }
 
 CItem* CItem::AddFileFromDiscovery(const DiscoveredFile& file) {
@@ -971,22 +966,11 @@ void CItem::UpdateStatsFromDisk()
 }
 
 void CItem::ScanItems(BlockingQueue<CItem*>* queue)
-    
 {
     auto* doc = CDirStatDoc::Get();
     ASSERT(doc != nullptr);
     if (doc == nullptr || queue == nullptr)
         return;
-
-    CItemDiscoverySink sink(*doc);
-    IScanEngine* engine = doc->GetScanEngine();
-    ASSERT(engine != nullptr);
-    if (engine == nullptr)
-        return;
-
-    // Temporary serialization while the legacy scan engine still shares
-    // mutable context across worker threads.
-    static std::mutex engineScanMutex;
 
     while (true)
     {
@@ -998,8 +982,7 @@ void CItem::ScanItems(BlockingQueue<CItem*>* queue)
         if (item == nullptr)
             continue;
 
-        std::scoped_lock lock(engineScanMutex);
-        engine->Scan({ ScanTask{ item->GetPath() } }, sink);
+        doc->StartScan(item->GetPath());
     }
 }
 

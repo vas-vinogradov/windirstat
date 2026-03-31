@@ -247,14 +247,8 @@ public:
     void RemoveUnknownItem();
     void UpwardDrivePacman();
 
-    struct DiscoveryDirectoryResult
-    {
-        CItem* item;
-        bool shouldQueue;
-    };
-
     // Adds a directory using the DiscoveredDirectory DTO
-    DiscoveryDirectoryResult AddDirectoryFromDiscovery(const DiscoveredDirectory& dir);
+    CItem* AddDirectoryFromDiscovery(const DiscoveredDirectory& dir, bool follow);
     // Adds a file using the DiscoveredFile DTO
     CItem* AddFileFromDiscovery(const DiscoveredFile& file);
     // Existing Finder-based overloads (unchanged)

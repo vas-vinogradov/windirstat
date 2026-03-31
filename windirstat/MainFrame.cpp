@@ -760,7 +760,7 @@ void CMainFrame::OnClose()
     m_shuttingDown = true;
 
     // Suspend the scan and wait for scan to complete
-    CDirStatDoc::Get()->StopScanningEngine(CDirStatDoc::Abort);
+    CDirStatDoc::Get()->StopScanningEngine(ScanTerminalReason::EngineInterrupted);
 
     // Stop icon queue
     GetIconHandler()->StopAsyncShellInfoQueue();

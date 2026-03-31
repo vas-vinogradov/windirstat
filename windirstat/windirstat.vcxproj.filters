@@ -317,7 +317,13 @@
     <ClInclude Include="Localization.h">
       <Filter>Header Files\User Interface</Filter>
     </ClInclude>
+    <ClInclude Include="CItemScanObserver.h">
+      <Filter>Header Files\Adapters</Filter>
+    </ClInclude>
     <ClInclude Include="IScanEngine.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="IScanObserver.h">
       <Filter>Header Files\Contracts</Filter>
     </ClInclude>
     <ClInclude Include="LegacyScanEngine.h">
@@ -335,13 +341,13 @@
     <ClInclude Include="ScanRequest.h">
       <Filter>Header Files\Contracts</Filter>
     </ClInclude>
+    <ClInclude Include="ScanError.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
     <ClInclude Include="ScanEngineFactory.h">
       <Filter>Header Files\Composition</Filter>
     </ClInclude>
-    <ClInclude Include="ItemDiscoverySink.h">
-      <Filter>Header Files\Adapters</Filter>
-    </ClInclude>
-    <ClInclude Include="LegacyDiscoveryExtractor.h">
+    <ClInclude Include="LegacyDiscoveryEngine.h">
       <Filter>Header Files\Engine\Scanning\Discovery</Filter>
     </ClInclude>
     <ClInclude Include="DiscoveredFile.h">
@@ -353,23 +359,14 @@
     <ClInclude Include="DiscoveryBatch.h">
       <Filter>Header Files\Engine\Scanning\Discovery</Filter>
     </ClInclude>
-    <ClInclude Include="IDirectoryScanner.h">
-      <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
+    <ClInclude Include="DirectoryProgressBatch.h">
+      <Filter>Header Files\Contracts</Filter>
     </ClInclude>
     <ClInclude Include="ScanTask.h">
       <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
     </ClInclude>
-    <ClInclude Include="ScanScheduler.h">
-      <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="IDiscoveryBatchSink.h">
-      <Filter>Header Files\Engine\Scanning\Sink</Filter>
-    </ClInclude>
     <ClInclude Include="LegacyDiscoveryRequest.h">
       <Filter>Header Files\Engine\Scanning</Filter>
-    </ClInclude>
-    <ClInclude Include="IDiscoverySink.h">
-      <Filter>Header Files\Core</Filter>
     </ClInclude>
     <ClInclude Include="FileSystem.h">
       <Filter>Header Files\Core\Helpers</Filter>
@@ -377,16 +374,13 @@
     <ClInclude Include="FileEnumeration.h">
       <Filter>Header Files\Core\Helpers</Filter>
     </ClInclude>
-    <ClInclude Include="IDiscoveryLink.h">
-      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
-    </ClInclude>
-    <ClInclude Include="LegacyDiscoveryLink.h">
-      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dialogs\AboutDlg.cpp">
       <Filter>Source Files\User Interface\Dialogs</Filter>
+    </ClCompile>
+    <ClCompile Include="CItemScanObserver.cpp">
+      <Filter>Source Files\Adapters</Filter>
     </ClCompile>
     <ClCompile Include="Dialogs\SelectDrivesDlg.cpp">
       <Filter>Source Files\User Interface\Dialogs</Filter>
@@ -544,13 +538,7 @@
     <ClCompile Include="ScanEngineFactory.cpp">
       <Filter>Source Files\Composition</Filter>
     </ClCompile>
-    <ClCompile Include="ItemDiscoverySink.cpp">
-      <Filter>Source Files\Adapters</Filter>
-    </ClCompile>
-    <ClCompile Include="LegacyDiscoveryExtractor.cpp">
-      <Filter>Source Files\Engine\Scanning\Discovery</Filter>
-    </ClCompile>
-    <ClCompile Include="ScanScheduler.cpp">
+    <ClCompile Include="LegacyDiscoveryEngine.cpp">
       <Filter>Source Files\Engine\Scanning\Discovery</Filter>
     </ClCompile>
     <ClCompile Include="FileSystem.cpp">
@@ -558,9 +546,6 @@
     </ClCompile>
     <ClCompile Include="FileEnumeration.cpp">
       <Filter>Source Files\Core\Helpers</Filter>
-    </ClCompile>
-    <ClCompile Include="LegacyDiscoveryLink.cpp">
-      <Filter>Source Files\Engine\Scanning\Discovery</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

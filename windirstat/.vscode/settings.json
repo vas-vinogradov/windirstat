@@ -1,0 +1,8 @@
+{
+  "clangd.arguments": [
+    "--background-index",
+    "--completion-style=detailed",
+    "--query-driver=C:/Program Files/Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/bin/Hostx64/x64/cl.exe",
+    "--compile-commands-dir=${workspaceFolder}"
+  ]
+}

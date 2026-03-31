@@ -1,10 +1,10 @@
-﻿#include "pch.h"
-#include "LegacyDiscoveryExtractor.h"
+#include "pch.h"
+#include "LegacyDiscoveryEngine.h"
 
 #include "FinderBasic.h"
 #include "FinderNtfs.h"
 
-DiscoveryBatch LegacyDiscoveryExtractor::Extract(const LegacyDiscoveryRequest& request) {
+DiscoveryBatch LegacyDiscoveryEngine::Discover(const LegacyDiscoveryRequest& request) {
     DiscoveryBatch batch;
     batch.scannedPath = request.path;
     Finder* finder = nullptr;

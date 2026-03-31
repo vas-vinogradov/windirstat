@@ -1,0 +1,17 @@
+CompileFlags:
+  Add:
+    - /std:c++20
+    - /MD
+    - /EHsc
+    - /DUNICODE
+    - /D_UNICODE
+    - /DWIN32
+    - /D_WINDOWS
+    - /D_AFXDLL
+    - /D_MT
+    - /D_DLL
+    - /Iwindirstat
+    - /Iwindirstat/Controls
+    - /Iwindirstat/Dialogs
+    - /Iwindirstat/Pages
+    - /Iwindirstat/Views

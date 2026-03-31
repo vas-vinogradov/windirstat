@@ -17,21 +17,18 @@
 
 #include "pch.h"
 #include "CsvLoader.h"
+#include "CItemScanObserver.h"
 #include "FileTreeView.h"
 #include "TreeMapView.h"
 #include "FileTopControl.h"
 #include "FileSearchControl.h"
 #include "FileWatcherControl.h"
 #include "FinderBasic.h"
-#include "FinderNtfs.h"
-#include "IScanEngine.h"
 #include "SearchDlg.h"
 #include "ProgressDlg.h"
 #include "ScanEngineFactory.h"
 
 IMPLEMENT_DYNCREATE(CDirStatDoc, CDocument)
-
-std::unique_ptr<IScanEngine> m_scanEngine;
 
 CDirStatDoc::CDirStatDoc() :
         m_showFreeSpace(COptions::ShowFreeSpace)
@@ -56,6 +53,35 @@ IScanEngine* CDirStatDoc::GetScanEngine() const {
     return m_scanEngine.get();
 }
 
+void CDirStatDoc::StartScan(const std::wstring& rootPath)
+{
+    if (m_scanObserver == nullptr)
+        return;
+
+    ScanRequest request{};
+    request.rootPath = rootPath;
+    StartScan(request);
+}
+
+void CDirStatDoc::StartScan(const ScanRequest& request)
+{
+    IScanEngine* engine = GetScanEngine();
+    ASSERT(engine != nullptr);
+    if (engine == nullptr)
+        return;
+
+    ASSERT(m_scanObserver != nullptr);
+    if (m_scanObserver == nullptr)
+        return;
+
+    engine->Enqueue(request);
+}
+
+std::uint64_t CDirStatDoc::GetActiveScanRequestId() const
+{
+    return m_scanEngine != nullptr ? m_scanEngine->GetActiveRequestId() : 0;
+}
+
 CDirStatDoc::~CDirStatDoc()
 {
     delete m_rootItem;
@@ -69,7 +95,7 @@ void CDirStatDoc::DeleteContents()
     CWaitCursor wc;
 
     // Wait for system to fully shutdown
-    StopScanningEngine(Abort);
+    StopScanningEngine(ScanTerminalReason::EngineInterrupted);
 
     // Stop watchers
     if (CFileWatcherControl::Get() != nullptr) CFileWatcherControl::Get()->StopMonitoring();
@@ -279,11 +305,7 @@ bool CDirStatDoc::IsRootDone() const
 
 bool CDirStatDoc::IsScanRunning() const
 {
-    if (!m_thread.has_value()) return false;
-
-    DWORD exitCode;
-    GetExitCodeThread(const_cast<std::jthread&>(*m_thread).native_handle(), &exitCode);
-    return (exitCode == STILL_ACTIVE);
+    return m_scanEngine != nullptr && m_scanEngine->IsRunning();
 }
 
 CItem* CDirStatDoc::GetRootItem() const
@@ -1693,9 +1715,8 @@ void CDirStatDoc::OnCleanupOptimizeVhd()
 
 void CDirStatDoc::OnScanSuspend()
 {
-    // Wait for system to fully shutdown
-    for (auto& queue : m_queues | std::views::values)
-        ProcessMessagesUntilSignaled([&queue] { queue.SuspendExecution(); });
+    if (m_scanEngine != nullptr)
+        ProcessMessagesUntilSignaled([this] { m_scanEngine->Suspend(); });
 
     // Mark as suspended
     if (CMainFrame::Get() != nullptr)
@@ -1704,8 +1725,8 @@ void CDirStatDoc::OnScanSuspend()
 
 void CDirStatDoc::OnScanResume()
 {
-    for (auto& queue : m_queues | std::views::values)
-        queue.ResumeExecution();
+    if (m_scanEngine != nullptr)
+        m_scanEngine->Resume();
 
     if (CMainFrame::Get() != nullptr)
         CMainFrame::Get()->SuspendState(false);
@@ -1713,27 +1734,13 @@ void CDirStatDoc::OnScanResume()
 
 void CDirStatDoc::OnScanStop()
 {
-    StopScanningEngine(Stop);
+    StopScanningEngine(ScanTerminalReason::UserCancel);
 }
 
-void CDirStatDoc::StopScanningEngine(StopReason stopReason)
+void CDirStatDoc::StopScanningEngine(const ScanTerminalReason reason)
 {
-    // Request for all threads to stop processing
-    for (auto& queue : m_queues | std::views::values)
-        ProcessMessagesUntilSignaled([&queue] { queue.SuspendExecution(); });
-
-    // Stop m_queues from executing
-    for (auto& queue : m_queues | std::views::values)
-        ProcessMessagesUntilSignaled([&queue, &stopReason] { queue.CancelExecution(stopReason); });
-
-    // Wait for wrapper thread to complete
-    if (m_thread.has_value())
-    {
-        CWaitCursor waitCursor;
-        ProcessMessagesUntilSignaled([this] { m_thread->join(); });
-        m_thread.reset();
-        m_queues.clear();
-    }
+    if (m_scanEngine != nullptr)
+        ProcessMessagesUntilSignaled([this, reason] { m_scanEngine->Cancel(reason); });
 }
 
 void CDirStatDoc::OnContextMenuExplore(UINT nID)
@@ -1772,7 +1779,7 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
     
     // Stop any previous executions
     CWaitCursor wc;
-    StopScanningEngine();
+    StopScanningEngine(ScanTerminalReason::Restarted);
 
     // Address conflicts with currently zoomed/selected items
     const auto zoomItem = GetZoomItem();
@@ -1806,8 +1813,7 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
 
     // Remove items in UI thread so we do not conflict with the timer updates
     const auto selectedItems = GetAllSelected();
-    using VisualInfo = struct { int scrollPosition; bool wasExpanded; bool isSelected; };
-    std::unordered_map<CItem*, VisualInfo> visualInfo;
+    std::unordered_map<CItem*, ScanVisualInfo> visualInfo;
     for (auto item : std::vector(items))
     {
         // Clear items from duplicates and top list;
@@ -1822,24 +1828,6 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
             visualInfo[item].wasExpanded = item->IsExpanded();
             visualInfo[item].scrollPosition = item->GetScrollPosition();
         }
-
-        // Skip pruning if it is a new element
-        if (!item->IsDone()) continue;
-
-        // Remove item from tree
-        item->ExtensionDataProcessChildren(true);
-        item->UpwardRecalcLastChange();
-        item->UpwardSubtractSizePhysical(item->GetSizePhysicalRaw());
-        item->UpwardSubtractSizeLogical(item->GetSizeLogical());
-        item->UpwardSubtractFiles(item->GetFilesCount());
-        item->UpwardSubtractFolders(item->GetFoldersCount());
-        item->RemoveAllChildren();
-        item->UpwardSetUndone();
-
-        // Child removal will collapse the item, so re-expand it
-        if (const auto iter = visualInfo.find(item);
-            iter != visualInfo.end() && item->IsVisible())
-            item->SetExpanded(iter->second.wasExpanded);
 
         // Handle if item to be refreshed has been removed
         if (item->IsTypeOrFlag(IT_FILE, IT_DIRECTORY, IT_DRIVE) &&
@@ -1863,154 +1851,136 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
     }
     CDirStatDoc::InvalidateSelectionCache();
 
-    // Start a thread so we do not hang the message loop during inserts
-    // Lambda captures assume document exists for duration of thread
-    m_thread.emplace([this,items, visualInfo] () mutable
+    m_scanItems = items;
+    m_scanVisualInfo = std::move(visualInfo);
+    m_scanObserver = std::make_unique<CItemScanObserver>(*this);
+
+    bool started = false;
+    for (const auto& item : m_scanItems)
     {
-        // Add items to processing queue
-        for (const auto & item : items)
+        if (!item->IsTypeOrFlag(ITF_ROOTITEM) && !CDirStatApp::Get()->IsFollowingAllowed(item->GetReparseTag()))
         {
-            // Skip any items we should not follow
-            if (!item->IsTypeOrFlag(ITF_ROOTITEM) && !CDirStatApp::Get()->IsFollowingAllowed(item->GetReparseTag()))
-            {
-                continue;
-            }
-
-            item->UpwardAddReadJobs(1);
-            item->UpwardSetUndone();
-
-            // Create status progress bar
-            CMainFrame::Get()->InvokeInMessageThread([]
-            {
-                CMainFrame::Get()->UpdateProgress();
-            });
-
-            // Separate into separate m_queues per volume
-            m_queues[item->GetVolumeRoot()->GetPath()].Push(item);
+            continue;
         }
 
-        // Create subordinate threads if there is work to do
-        for (auto& queue : m_queues)
+        item->UpwardAddReadJobs(1);
+        item->UpwardSetUndone();
+
+        CMainFrame::Get()->InvokeInMessageThread([]()
         {
-            auto* queuePtr = &queue.second;
-            queue.second.StartThreads(COptions::ScanningThreads, [queuePtr]()
-            {
-                CItem::ScanItems(queuePtr);
-            });
+            CMainFrame::Get()->UpdateProgress();
+        });
+
+        ScanRequest request{};
+        request.rootPath = item->GetPath();
+        if (!started)
+        {
+            GetScanEngine()->StartScan(request, *m_scanObserver);
+            started = true;
+        }
+        else
+        {
+            StartScan(request);
+        }
+    }
+
+    CMainFrame::Get()->InvokeInMessageThread([]()
+    {
+        CDirStatApp::Get()->OnIdle(0);
+        CMainFrame::Get()->Invalidate();
+    });
+}
+
+void CDirStatDoc::FinalizeScan(
+    const std::uint64_t requestId,
+    const bool canceled,
+    const ScanTerminalReason reason)
+{
+    if (requestId != GetActiveScanRequestId())
+        return;
+
+    for (const auto& item : m_scanItems)
+    {
+        if (!item->IsTypeOrFlag(IT_DRIVE)) continue;
+
+        if (COptions::ShowFreeSpace)
+        {
+            item->CreateFreeSpaceItem();
+        }
+        if (COptions::ShowUnknown)
+        {
+            item->CreateUnknownItem();
+        }
+    }
+
+    auto drives = GetRootItem()->GetDriveItems();
+    if (COptions::ProcessHardlinks) std::for_each(std::execution::par, drives.begin(), drives.end(), [](auto* drive)
+    {
+        if (drive->FindHardlinksItem() == nullptr)
+        {
+            drive->CreateHardlinksItem();
         }
 
-        // Ensure toolbar buttons reflect scanning status
+        drive->DoHardlinkAdjustment();
+    });
+    else std::for_each(std::execution::par, drives.begin(), drives.end(), [](auto* drive)
+    {
+        if (drive->FindHardlinksItem() != nullptr)
+        {
+            drive->RemoveHardlinksItem();
+        }
+    });
+
+    if (canceled && reason == ScanTerminalReason::EngineInterrupted)
+    {
         CMainFrame::Get()->InvokeInMessageThread([]
         {
-            CDirStatApp::Get()->OnIdle(0);
-            CMainFrame::Get()->Invalidate();
-        });
-
-        // Wait for all threads to run out of work
-        StopReason stopReason = Default;
-        for (auto& queue : m_queues | std::views::values)
-            stopReason = static_cast<StopReason>(queue.WaitForCompletion());
-   
-        // Restore unknown and freespace items
-        for (const auto& item : items)
-        {
-            if (!item->IsTypeOrFlag(IT_DRIVE)) continue;
-            
-            if (COptions::ShowFreeSpace)
-            {
-                item->CreateFreeSpaceItem();
-            }
-            if (COptions::ShowUnknown)
-            {
-                item->CreateUnknownItem();
-            }
-        }
-
-        // Handle hardlink counting for the drive
-        auto drives = GetRootItem()->GetDriveItems();
-        if (COptions::ProcessHardlinks) std::for_each(std::execution::par, drives.begin(), drives.end(), [](auto* drive)
-        {
-            // Create hardlink item if it doesn't exist
-            if (drive->FindHardlinksItem() == nullptr)
-            {
-                drive->CreateHardlinksItem();
-            }
-
-            drive->DoHardlinkAdjustment();
-        });
-        else std::for_each(std::execution::par, drives.begin(), drives.end(), [](auto* drive)
-        {
-            // Remove hardlink item if processing is disabled
-            if (drive->FindHardlinksItem() != nullptr)
-            {
-                drive->RemoveHardlinksItem();
-            }
-        });
-
-        // If new scan or closing, indicate done and exit early
-        if (stopReason == Abort)
-        {
-            CMainFrame::Get()->InvokeInMessageThread([&]
-            {
-                CMainFrame::Get()->SetProgressComplete();
-            });
-            return;
-        }
-
-        TRACE(L"[PERF] finalize reached %llu ms\n", GetTickCount64() - m_scanStart);
-
-        // Sorting and other finalization tasks
-        CItem::ScanItemsFinalize(GetRootItem());
-        Get()->RebuildExtensionData();
-
-        // Handle quiet save mode if path is set
-        if (const auto csvPath = CDirStatApp::Get()->GetSaveToCsvPath(); !csvPath.empty())
-        {
-            // Get the document and root item
-            const auto* doc = CDirStatDoc::Get();
-            if (doc == nullptr || !doc->HasRootItem()) ExitProcess(1);
-
-            // Run scan and exit with success == 0 or failure == 1
-            ExitProcess(SaveResults(csvPath, doc->GetRootItem()) ? 0 : 1);
-        }
-
-        // Handle quiet save duplicates mode if path is set
-        if (const auto dupeCsvPath = CDirStatApp::Get()->GetSaveDupesToCsvPath(); !dupeCsvPath.empty())
-        {
-            // Get the duplicate root item
-            CFileDupeControl::Get()->SortItems();
-            const auto* dupeRoot = CFileDupeControl::Get()->GetRootItem();
-            if (dupeRoot == nullptr) ExitProcess(1);
-
-            // Run scan and exit with success == 0 or failure == 1
-            ExitProcess(SaveDuplicates(dupeCsvPath, dupeRoot) ? 0 : 1);
-        }
-
-        // Invoke a UI thread to do updates
-        CMainFrame::Get()->InvokeInMessageThread([&]
-        {
-            CMainFrame::Get()->LockWindowUpdate();
-            Get()->UpdateAllViews(nullptr);
             CMainFrame::Get()->SetProgressComplete();
-            CMainFrame::Get()->RestoreExtensionView();
-            CMainFrame::Get()->RestoreTreeMapView();
-            CMainFrame::Get()->GetTreeMapView()->SuspendRecalculationDrawing(false);
-            CMainFrame::Get()->UnlockWindowUpdate();
-
-            // Restore pre-scan visual orientation
-            for (const auto& item : visualInfo | std::views::keys)
-            {
-                if (GetFocusControl()->FindTreeItem(item) == -1 || !item->IsVisible()) continue;
-
-                // Restore scroll position and selection if previously set
-                item->SetScrollPosition(visualInfo[item].scrollPosition);
-                if (visualInfo[item].isSelected) GetFocusControl()->SelectItem(item, false, true);
-            }
         });
+        return;
+    }
 
-        // Force heap cleanup after scan
-        (void) _heapmin();
+    TRACE(L"[PERF] finalize reached %llu ms\n", GetTickCount64() - m_scanStart);
+
+    CItem::ScanItemsFinalize(GetRootItem());
+    Get()->RebuildExtensionData();
+
+    if (const auto csvPath = CDirStatApp::Get()->GetSaveToCsvPath(); !csvPath.empty())
+    {
+        const auto* doc = CDirStatDoc::Get();
+        if (doc == nullptr || !doc->HasRootItem()) ExitProcess(1);
+        ExitProcess(SaveResults(csvPath, doc->GetRootItem()) ? 0 : 1);
+    }
+
+    if (const auto dupeCsvPath = CDirStatApp::Get()->GetSaveDupesToCsvPath(); !dupeCsvPath.empty())
+    {
+        CFileDupeControl::Get()->SortItems();
+        const auto* dupeRoot = CFileDupeControl::Get()->GetRootItem();
+        if (dupeRoot == nullptr) ExitProcess(1);
+        ExitProcess(SaveDuplicates(dupeCsvPath, dupeRoot) ? 0 : 1);
+    }
+
+    auto visualInfo = m_scanVisualInfo;
+    CMainFrame::Get()->InvokeInMessageThread([this, visualInfo]
+    {
+        CMainFrame::Get()->LockWindowUpdate();
+        Get()->UpdateAllViews(nullptr);
+        CMainFrame::Get()->SetProgressComplete();
+        CMainFrame::Get()->RestoreExtensionView();
+        CMainFrame::Get()->RestoreTreeMapView();
+        CMainFrame::Get()->GetTreeMapView()->SuspendRecalculationDrawing(false);
+        CMainFrame::Get()->UnlockWindowUpdate();
+
+        for (const auto& item : visualInfo | std::views::keys)
+        {
+            if (GetFocusControl()->FindTreeItem(item) == -1 || !item->IsVisible()) continue;
+
+            item->SetScrollPosition(visualInfo.at(item).scrollPosition);
+            if (visualInfo.at(item).isSelected) GetFocusControl()->SelectItem(item, false, true);
+        }
     });
+
+    (void)_heapmin();
 }
 
 void CDirStatDoc::OnRemoveMarkOfTheWebTags()

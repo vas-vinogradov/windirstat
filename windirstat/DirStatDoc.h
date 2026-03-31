@@ -20,6 +20,7 @@
 #include "pch.h"
 
 #include "IScanEngine.h"
+#include "ScanTerminalReason.h"
 #include "TreeListControl.h"
 #include <ScanResultToCItemMapper.h>
 
@@ -27,7 +28,15 @@ class CItem;
 class CItemDupe;
 class CItemTop;
 class CItemSearch;
+class CItemScanObserver;
 enum LOGICAL_FOCUS : uint8_t;
+
+struct ScanVisualInfo
+{
+    int scrollPosition = 0;
+    bool wasExpanded = false;
+    bool isSelected = false;
+};
 
 //
 // Data stored for each extension.
@@ -85,14 +94,20 @@ class CDirStatDoc final : public CDocument
 public:
     static CDirStatDoc* Get() { return s_singleton; }
     void StartScan(const std::wstring& rootPath);
+    void StartScan(const ScanRequest& request);
+    std::uint64_t GetActiveScanRequestId() const;
     IScanEngine* GetScanEngine() const;
     ULONGLONG m_scanStart = 0;
 
 private:
+    friend class CItemScanObserver;
+
     std::unique_ptr<IScanEngine> m_scanEngine;
+    std::unique_ptr<CItemScanObserver> m_scanObserver;
     std::unique_ptr<ScanResultToCItemMapper> m_mapper;
     // Helper to initialize the scan engine
     void InitializeScanEngine();
+    void FinalizeScan(std::uint64_t requestId, bool canceled, ScanTerminalReason reason = ScanTerminalReason::EngineInterrupted);
     
 
 protected:
@@ -130,8 +145,7 @@ protected:
     void UnlinkRoot();
     bool UserDefinedCleanupWorksForItem(USERDEFINEDCLEANUP* udc, const CItem* item) const;
     void StartScanningEngine(std::vector<CItem*> items);
-    enum StopReason : uint8_t { Default, Stop, Abort };
-    void StopScanningEngine(StopReason stopReason = Stop);
+    void StopScanningEngine(ScanTerminalReason reason = ScanTerminalReason::Restarted);
     void RefreshItem(const std::vector<CItem*>& item) const;
     void RefreshItem(CItem* item) const { RefreshItem(std::vector{ item }); }
 
@@ -176,8 +190,8 @@ protected:
 
     std::vector<CItem*> m_reselectChildStack; // Stack for the "Re-select Child"-Feature
 
-    std::unordered_map<std::wstring, BlockingQueue<CItem*>> m_queues; // The scanning and thread queue
-    std::optional<std::jthread> m_thread; // Wrapper thread so we do not occupy the UI thread
+    std::vector<CItem*> m_scanItems;
+    std::unordered_map<CItem*, ScanVisualInfo> m_scanVisualInfo;
 
     // Cache for GetAllSelected to avoid expensive queries
     LOGICAL_FOCUS m_cachedFocus{}; 
