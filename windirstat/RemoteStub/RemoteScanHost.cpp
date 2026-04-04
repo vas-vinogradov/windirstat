@@ -1,8 +1,9 @@
 #include "pch.h"
-#include "RemoteStub/FakeRemoteScanHost.h"
+#include "RemoteStub/RemoteScanHost.h"
 
 #include "LegacyDiscoveryRequest.h"
 #include "RemoteStub/NamedPipeRpcServer.h"
+#include "RemoteStub/StubDirectoryDiscoveryEngine.h"
 
 namespace
 {
@@ -25,9 +26,28 @@ void RpcHostLog(std::uint64_t requestId, std::wstring_view event, std::wstring_v
     line += L"\n";
     OutputDebugStringW(line.c_str());
 }
+
+bool UseStubDiscoveryEngine()
+{
+    std::array<wchar_t, 16> buffer{};
+    const DWORD length = GetEnvironmentVariable(L"WINDIRSTAT_REMOTE_DISCOVERY_ENGINE", buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length == 0 || length >= buffer.size())
+        return false;
+
+    std::wstring value(buffer.data(), length);
+    _wcslwr_s(value.data(), value.size() + 1);
+    return value == L"stub";
+}
 }
 
-int FakeRemoteScanHost::Run(const std::wstring& pipeName)
+RemoteScanHost::RemoteScanHost()
+    : m_discoveryEngine(CreateDiscoveryEngine())
+{
+    RpcHostLog(0, L"DiscoveryEngineSelected",
+        std::format(L"implementation={}", GetDiscoveryEngineMode()));
+}
+
+int RemoteScanHost::Run(const std::wstring& pipeName)
 {
     NamedPipeRpcServer server(pipeName);
     if (!server.Listen())
@@ -40,6 +60,9 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
     {
         if (activeRequest.requestId != 0 && activeRequest.cancelPending)
         {
+            ASSERT(activeRequest.requestId != 0);
+            ASSERT(activeRequest.cancelPending);
+            ASSERT(activeRequest.pendingPaths.empty());
             RpcHostLog(activeRequest.requestId, L"TerminalEmitted",
                 std::format(L"terminal=Canceled reason={} queueSize={}",
                     static_cast<int>(activeRequest.cancelReason), activeRequest.pendingPaths.size()));
@@ -53,6 +76,10 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
 
         if (activeRequest.requestId != 0 && activeRequest.inputClosed && activeRequest.pendingPaths.empty())
         {
+            ASSERT(activeRequest.requestId != 0);
+            ASSERT(activeRequest.inputClosed);
+            ASSERT(activeRequest.pendingPaths.empty());
+            ASSERT(!activeRequest.cancelPending);
             RpcHostLog(activeRequest.requestId, L"TerminalEmitted", L"terminal=Completed queueSize=0");
             if (!SendCompleted(server, activeRequest))
                 return 3;
@@ -64,6 +91,7 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
 
         if (!activeRequest.pendingPaths.empty())
         {
+            ASSERT(activeRequest.requestId != 0);
             const std::wstring path = std::move(activeRequest.pendingPaths.front());
             activeRequest.pendingPaths.pop_front();
             RpcHostLog(activeRequest.requestId, L"DirectoryProcessingStarted",
@@ -102,12 +130,16 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
             {
                 if (activeRequest.requestId == 0)
                 {
+                    ASSERT(message.requestId != 0);
                     RpcHostLog(message.requestId, L"StartScanReceived",
                         std::format(L"path=\"{}\"", message.rootPath));
                     StartActiveRequest(activeRequest, message.requestId, message.rootPath);
                 }
                 else
                 {
+                    ASSERT(activeRequest.requestId != 0);
+                    ASSERT(message.requestId != 0);
+                    ASSERT(activeRequest.requestId != message.requestId);
                     // The host is intentionally a single-session, single-active-request loop.
                     // Replacement is explicit: cancel the old request first, then activate the
                     // queued replacement after the old request has emitted its terminal event.
@@ -118,6 +150,9 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
                     activeRequest.cancelReason = ScanTerminalReason::Restarted;
                     activeRequest.inputClosed = true;
                     activeRequest.pendingPaths.clear();
+                    ASSERT(activeRequest.cancelPending);
+                    ASSERT(activeRequest.inputClosed);
+                    ASSERT(activeRequest.pendingPaths.empty());
                 }
             }
 
@@ -125,6 +160,7 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
             {
                 if (message.requestId == activeRequest.requestId && !activeRequest.inputClosed && !activeRequest.cancelPending)
                 {
+                    ASSERT(activeRequest.requestId != 0);
                     RpcHostLog(message.requestId, L"EnqueueReceived",
                         std::format(L"path=\"{}\" queueSize={}", message.rootPath, activeRequest.pendingPaths.size() + 1));
                     activeRequest.pendingPaths.push_back(message.rootPath);
@@ -135,6 +171,7 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
             {
                 if (message.requestId == activeRequest.requestId && !activeRequest.cancelPending)
                 {
+                    ASSERT(activeRequest.requestId != 0);
                     RpcHostLog(message.requestId, L"CloseRequestInputReceived",
                         std::format(L"queueSize={}", activeRequest.pendingPaths.size()));
                     activeRequest.inputClosed = true;
@@ -145,6 +182,7 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
             {
                 if (message.requestId == activeRequest.requestId)
                 {
+                    ASSERT(activeRequest.requestId != 0);
                     RpcHostLog(message.requestId, L"CancelReceived",
                         std::format(L"reason={} queueSize={}", static_cast<int>(message.reason), activeRequest.pendingPaths.size()));
                     activeRequest.cancelPending = true;
@@ -152,6 +190,7 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
                     activeRequest.inputClosed = true;
                     activeRequest.pendingPaths.clear();
                     queuedStart.reset();
+                    ASSERT(activeRequest.pendingPaths.empty());
                 }
             }
         }, messageOpt.value());
@@ -160,19 +199,29 @@ int FakeRemoteScanHost::Run(const std::wstring& pipeName)
     return 0;
 }
 
-void FakeRemoteScanHost::ResetActiveRequest(ActiveRequestState& state)
+void RemoteScanHost::ResetActiveRequest(ActiveRequestState& state)
 {
     const std::uint64_t requestId = state.requestId;
+    ASSERT(requestId != 0);
     state.requestId = 0;
     state.pendingPaths.clear();
     state.inputClosed = false;
     state.cancelPending = false;
     state.cancelReason = ScanTerminalReason::EngineInterrupted;
+    ASSERT(state.requestId == 0);
+    ASSERT(state.pendingPaths.empty());
+    ASSERT(!state.inputClosed);
+    ASSERT(!state.cancelPending);
     RpcHostLog(requestId, L"RequestReset", L"queueSize=0 inputClosed=0 cancelPending=0");
 }
 
-void FakeRemoteScanHost::StartActiveRequest(ActiveRequestState& state, const std::uint64_t requestId, const std::wstring& rootPath)
+void RemoteScanHost::StartActiveRequest(ActiveRequestState& state, const std::uint64_t requestId, const std::wstring& rootPath)
 {
+    ASSERT(requestId != 0);
+    ASSERT(state.requestId == 0);
+    ASSERT(state.pendingPaths.empty());
+    ASSERT(!state.inputClosed);
+    ASSERT(!state.cancelPending);
     state.requestId = requestId;
     state.pendingPaths.clear();
     state.pendingPaths.push_back(rootPath);
@@ -183,35 +232,48 @@ void FakeRemoteScanHost::StartActiveRequest(ActiveRequestState& state, const std
         std::format(L"path=\"{}\" queueSize=1 inputClosed=0 cancelPending=0", rootPath));
 }
 
-void FakeRemoteScanHost::PromoteQueuedStart(ActiveRequestState& state, std::optional<RpcStartScanRequest>& queuedStart)
+void RemoteScanHost::PromoteQueuedStart(ActiveRequestState& state, std::optional<RpcStartScanRequest>& queuedStart)
 {
     if (!queuedStart.has_value())
         return;
 
+    ASSERT(state.requestId == 0);
+    ASSERT(state.pendingPaths.empty());
+    ASSERT(!state.inputClosed);
+    ASSERT(!state.cancelPending);
     const RpcStartScanRequest nextStart = std::move(queuedStart.value());
     queuedStart.reset();
+    ASSERT(nextStart.requestId != 0);
     RpcHostLog(nextStart.requestId, L"ReplacementPromotion",
         std::format(L"path=\"{}\"", nextStart.rootPath));
     StartActiveRequest(state, nextStart.requestId, nextStart.rootPath);
 }
 
-bool FakeRemoteScanHost::SendCanceled(NamedPipeRpcServer& server, const ActiveRequestState& state)
+bool RemoteScanHost::SendCanceled(NamedPipeRpcServer& server, const ActiveRequestState& state)
 {
+    ASSERT(state.requestId != 0);
+    ASSERT(state.cancelPending);
+    ASSERT(state.pendingPaths.empty());
     RpcScanCanceledEvent canceledEvent{};
     canceledEvent.requestId = state.requestId;
     canceledEvent.reason = state.cancelReason;
     return server.SendEventMessage(RpcEventMessage(canceledEvent));
 }
 
-bool FakeRemoteScanHost::SendCompleted(NamedPipeRpcServer& server, const ActiveRequestState& state)
+bool RemoteScanHost::SendCompleted(NamedPipeRpcServer& server, const ActiveRequestState& state)
 {
+    ASSERT(state.requestId != 0);
+    ASSERT(state.inputClosed);
+    ASSERT(state.pendingPaths.empty());
+    ASSERT(!state.cancelPending);
     RpcScanCompletedEvent completed{};
     completed.requestId = state.requestId;
     return server.SendEventMessage(RpcEventMessage(completed));
 }
 
-FakeRemoteScanHost::DiscoveryResult FakeRemoteScanHost::ExecuteDiscovery(NamedPipeRpcServer& server, const std::uint64_t requestId, const std::wstring& path)
+RemoteScanHost::DiscoveryResult RemoteScanHost::ExecuteDiscovery(NamedPipeRpcServer& server, const std::uint64_t requestId, const std::wstring& path)
 {
+    ASSERT(requestId != 0);
     try
     {
         LegacyDiscoveryRequest request{};
@@ -219,7 +281,8 @@ FakeRemoteScanHost::DiscoveryResult FakeRemoteScanHost::ExecuteDiscovery(NamedPi
         request.ntfsContext = &m_contextNtfs;
         request.basicContext = &m_contextBasic;
 
-        DiscoveryBatch discoveryBatch = m_discoveryEngine.Discover(request);
+        ASSERT(m_discoveryEngine != nullptr);
+        DiscoveryBatch discoveryBatch = m_discoveryEngine->Discover(request);
 
         RpcDirectoryProgressEvent progress{};
         progress.requestId = requestId;
@@ -245,4 +308,17 @@ FakeRemoteScanHost::DiscoveryResult FakeRemoteScanHost::ExecuteDiscovery(NamedPi
             ? DiscoveryResult::RequestFailed
             : DiscoveryResult::TransportFailure;
     }
+}
+
+std::unique_ptr<IDirectoryDiscoveryEngine> RemoteScanHost::CreateDiscoveryEngine()
+{
+    if (UseStubDiscoveryEngine())
+        return std::make_unique<StubDirectoryDiscoveryEngine>();
+
+    return std::make_unique<LegacyDiscoveryEngine>();
+}
+
+std::wstring RemoteScanHost::GetDiscoveryEngineMode()
+{
+    return UseStubDiscoveryEngine() ? L"stub" : L"legacy";
 }

@@ -569,9 +569,10 @@
     <ClInclude Include="LegacyDiscoveryRequest.h" />
     <ClInclude Include="LegacyScanEngine.h" />
     <ClInclude Include="Pages\PagePrompts.h" />
-    <ClInclude Include="RemoteStub\FakeRemoteScanHost.h" />
+    <ClInclude Include="RemoteStub\RemoteScanHost.h" />
     <ClInclude Include="RemoteStub\NamedPipeRpcServer.h" />
     <ClInclude Include="RemoteStub\RemoteStubCommandLine.h" />
+    <ClInclude Include="RemoteStub\StubDirectoryDiscoveryEngine.h" />
     <ClInclude Include="ScanEngineFactory.h" />
     <ClInclude Include="ScanNode.h" />
     <ClInclude Include="ScanRequest.h" />
@@ -647,9 +648,10 @@
     <ClCompile Include="LegacyDiscoveryEngine.cpp" />
     <ClCompile Include="LegacyScanEngine.cpp" />
     <ClCompile Include="Pages\PagePrompts.cpp" />
-    <ClCompile Include="RemoteStub\FakeRemoteScanHost.cpp" />
+    <ClCompile Include="RemoteStub\RemoteScanHost.cpp" />
     <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp" />
     <ClCompile Include="RemoteStub\RemoteStubCommandLine.cpp" />
+    <ClCompile Include="RemoteStub\StubDirectoryDiscoveryEngine.cpp" />
     <ClCompile Include="ScanEngineFactory.cpp" />
     <ClCompile Include="ScanResultToCItemMapper.cpp" />
     <ClCompile Include="Views\ControlView.cpp" />

@@ -152,6 +152,9 @@ void CItemScanObserver::OnDirectoryProgress(DirectoryProgressBatch batch)
 
     if (batch.finished)
     {
+        // finished=true is the reconciliation boundary: this batch is the
+        // authoritative immediate child snapshot for batch.directoryPath, so
+        // previously known children omitted here may be removed.
         for (const auto& child : existingChildren | std::views::values)
         {
             RemoveProjectedChild(item, child);

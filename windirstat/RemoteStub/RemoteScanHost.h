@@ -6,12 +6,14 @@
 #include "LegacyDiscoveryEngine.h"
 
 #include <deque>
+#include <memory>
 #include <optional>
 #include <string>
 
-class FakeRemoteScanHost
+class RemoteScanHost
 {
 public:
+    RemoteScanHost();
     int Run(const std::wstring& pipeName);
 
 private:
@@ -37,8 +39,10 @@ private:
     bool SendCanceled(class NamedPipeRpcServer& server, const ActiveRequestState& state);
     bool SendCompleted(class NamedPipeRpcServer& server, const ActiveRequestState& state);
     DiscoveryResult ExecuteDiscovery(class NamedPipeRpcServer& server, std::uint64_t requestId, const std::wstring& path);
+    static std::unique_ptr<IDirectoryDiscoveryEngine> CreateDiscoveryEngine();
+    static std::wstring GetDiscoveryEngineMode();
 
     FinderNtfsContext m_contextNtfs{};
     FinderBasicContext m_contextBasic{};
-    LegacyDiscoveryEngine m_discoveryEngine{};
+    std::unique_ptr<IDirectoryDiscoveryEngine> m_discoveryEngine;
 };

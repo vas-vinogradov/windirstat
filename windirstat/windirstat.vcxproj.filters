@@ -239,13 +239,16 @@
     <ClInclude Include="Pages\PagePrompts.h">
       <Filter>Header Files\User Interface\Pages</Filter>
     </ClInclude>
-    <ClInclude Include="RemoteStub\FakeRemoteScanHost.h">
+    <ClInclude Include="RemoteStub\RemoteScanHost.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="RemoteStub\NamedPipeRpcServer.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="RemoteStub\RemoteStubCommandLine.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\StubDirectoryDiscoveryEngine.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
@@ -496,13 +499,16 @@
     <ClCompile Include="Pages\PagePrompts.cpp">
       <Filter>Source Files\User Interface\Pages</Filter>
     </ClCompile>
-    <ClCompile Include="RemoteStub\FakeRemoteScanHost.cpp">
+    <ClCompile Include="RemoteStub\RemoteScanHost.cpp">
       <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
     <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp">
       <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
     <ClCompile Include="RemoteStub\RemoteStubCommandLine.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\StubDirectoryDiscoveryEngine.cpp">
       <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
     <ClCompile Include="Controls\FileWatcherControl.cpp">

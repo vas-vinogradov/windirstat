@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "RemoteStub/RemoteStubCommandLine.h"
 
-#include "RemoteStub/FakeRemoteScanHost.h"
+#include "RemoteStub/RemoteScanHost.h"
 
 bool TryRunRemoteStubFromCommandLine()
 {
@@ -24,7 +24,7 @@ bool TryRunRemoteStubFromCommandLine()
     if (!runRemoteStub)
         return false;
 
-    FakeRemoteScanHost host;
+    RemoteScanHost host;
     ExitProcess(static_cast<UINT>(host.Run(pipeName)));
     return true;
 }

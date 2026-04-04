@@ -36,6 +36,9 @@ struct RpcCancelScanRequest
 struct RpcDirectoryProgressEvent
 {
     std::uint64_t requestId = 0;
+    // This is the discovered immediate child snapshot for one processed
+    // directory, not cosmetic progress. When finished=true, the child set is
+    // authoritative enough for omission-based reconciliation on the client.
     std::wstring directoryPath;
     std::vector<DiscoveredFile> files;
     std::vector<DiscoveredDirectory> directories;
@@ -56,6 +59,9 @@ struct RpcScanCanceledEvent
 struct RpcScanFailedEvent
 {
     std::uint64_t requestId = 0;
+    // Carries failure details for the active request/path. The current client
+    // contract consumes this as OnError(...) followed by terminal cancellation
+    // with EngineInterrupted rather than as a distinct observer terminal type.
     std::wstring path;
     std::wstring message;
     unsigned long errorCode = 0;

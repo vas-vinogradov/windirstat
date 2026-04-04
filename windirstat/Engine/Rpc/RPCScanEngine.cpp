@@ -46,6 +46,7 @@ RPCScanEngine::~RPCScanEngine()
 void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observer)
 {
     const std::uint64_t requestId = m_nextRequestId.fetch_add(1, std::memory_order_acq_rel);
+    ASSERT(requestId != 0);
     std::uint64_t requestToCancel = 0;
     bool startImmediately = false;
 
@@ -55,9 +56,15 @@ void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observe
         const std::uint64_t activeRequestId = m_activeRequestId.load(std::memory_order_acquire);
         if (activeRequestId != 0 && !m_terminalResolved.load(std::memory_order_acquire))
         {
+            ASSERT(activeRequestId != 0);
+            ASSERT(activeRequestId != requestId);
+            ASSERT(GetActiveObserver() != nullptr);
+            ASSERT(!m_requestInputClosed.load(std::memory_order_acquire));
+
             // One RPC session owns at most one active request. A restart first resolves
             // the old request terminally, then the queued replacement becomes active.
             m_pendingStart = PendingStart{ request, &observer, requestId };
+            ASSERT(m_pendingStart->requestId != 0);
             requestToCancel = activeRequestId;
             RpcClientLog(requestId, L"ReplacementQueued",
                 std::format(L"replaces={} path=\"{}\"", activeRequestId, request.rootPath));
@@ -118,6 +125,9 @@ void RPCScanEngine::Enqueue(const ScanRequest& request)
     if (m_cancelRequested.load(std::memory_order_acquire))
         return;
 
+    ASSERT(activeRequestId != 0);
+    ASSERT(!m_requestInputClosed.load(std::memory_order_acquire));
+    ASSERT(GetActiveObserver() != nullptr);
     m_outstandingWorkItems.fetch_add(1, std::memory_order_acq_rel);
 
     RpcEnqueueRequest enqueueRequest{};
@@ -147,6 +157,7 @@ void RPCScanEngine::Cancel(const ScanTerminalReason reason)
     if (requestId == 0 || m_terminalResolved.load(std::memory_order_acquire))
         return;
 
+    ASSERT(GetActiveObserver() != nullptr);
     if (m_cancelRequested.exchange(true, std::memory_order_acq_rel))
         return;
 
@@ -190,6 +201,8 @@ void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& e
     if (!IsCurrentRequest(event.requestId) || m_terminalResolved.load(std::memory_order_acquire))
         return;
 
+    ASSERT(event.requestId != 0);
+    ASSERT(GetActiveObserver() != nullptr);
     RpcClientLog(event.requestId, L"DirectoryProgressReceived",
         std::format(L"path=\"{}\" finished={} outstanding={}",
             event.directoryPath, event.finished ? 1 : 0,
@@ -210,6 +223,7 @@ void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& e
     if (event.finished)
     {
         const std::uint32_t current = m_outstandingWorkItems.load(std::memory_order_acquire);
+        ASSERT(current > 0);
         if (current == 0)
             return;
 
@@ -224,10 +238,12 @@ void RPCScanEngine::OnRemoteScanCompleted(const RpcScanCompletedEvent& event)
     if (!IsCurrentRequest(event.requestId))
         return;
 
+    ASSERT(event.requestId != 0);
     if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
         return;
 
     IScanObserver* const observer = GetActiveObserver();
+    ASSERT(observer != nullptr);
     RpcClientLog(event.requestId, L"TerminalReceived", L"terminal=Completed");
     ResetRequestLifecycle();
 
@@ -242,10 +258,12 @@ void RPCScanEngine::OnRemoteScanCanceled(const RpcScanCanceledEvent& event)
     if (!IsCurrentRequest(event.requestId))
         return;
 
+    ASSERT(event.requestId != 0);
     if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
         return;
 
     IScanObserver* const observer = GetActiveObserver();
+    ASSERT(observer != nullptr);
     RpcClientLog(event.requestId, L"TerminalReceived",
         std::format(L"terminal=Canceled reason={}", static_cast<int>(event.reason)));
     ResetRequestLifecycle();
@@ -261,10 +279,14 @@ void RPCScanEngine::OnRemoteScanFailed(const RpcScanFailedEvent& event)
     if (!IsCurrentRequest(event.requestId))
         return;
 
+    ASSERT(event.requestId != 0);
     if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
         return;
 
     IScanObserver* const observer = GetActiveObserver();
+    ASSERT(observer != nullptr);
+    // Wire-level "failed" currently means error details for the active request.
+    // The observer contract remains OnError(...) followed by terminal canceled.
     RpcClientLog(event.requestId, L"TerminalReceived",
         std::format(L"terminal=Failed path=\"{}\" errorCode={} message=\"{}\"",
             event.path, event.errorCode, event.message));
@@ -287,6 +309,7 @@ void RPCScanEngine::OnRemoteScanFailed(const RpcScanFailedEvent& event)
 void RPCScanEngine::OnTransportFailure(const unsigned long errorCode, const std::wstring& message)
 {
     const std::uint64_t requestId = m_activeRequestId.load(std::memory_order_acquire);
+    ASSERT(requestId == 0 || GetActiveObserver() != nullptr);
     RpcClientLog(requestId, L"TransportFailure",
         std::format(L"errorCode={} message=\"{}\"", errorCode, message));
     FailActiveRequestForTransport(errorCode, message);
@@ -305,8 +328,15 @@ IScanObserver* RPCScanEngine::GetActiveObserver() const
 
 void RPCScanEngine::ActivateRequest(IScanObserver& observer, const std::uint64_t requestId)
 {
+    ASSERT(requestId != 0);
+    ASSERT(m_activeRequestId.load(std::memory_order_acquire) == 0);
+    ASSERT(!m_running.load(std::memory_order_acquire));
+    ASSERT(m_outstandingWorkItems.load(std::memory_order_acquire) == 0);
+    ASSERT(!m_cancelRequested.load(std::memory_order_acquire));
+
     {
         std::scoped_lock lock(m_observerMutex);
+        ASSERT(m_activeObserver == nullptr);
         m_activeObserver = &observer;
     }
 
@@ -328,6 +358,8 @@ RPCScanEngine::PendingStart RPCScanEngine::TakePendingStart()
 
     PendingStart pending = std::move(m_pendingStart.value());
     m_pendingStart.reset();
+    ASSERT(pending.requestId != 0);
+    ASSERT(pending.observer != nullptr);
     return pending;
 }
 
@@ -337,6 +369,9 @@ void RPCScanEngine::StartPendingRequestIfAny()
     if (pending.requestId == 0 || pending.observer == nullptr)
         return;
 
+    ASSERT(m_activeRequestId.load(std::memory_order_acquire) == 0);
+    ASSERT(!m_running.load(std::memory_order_acquire));
+    ASSERT(GetActiveObserver() == nullptr);
     RpcClientLog(pending.requestId, L"PendingRequestPromotion",
         std::format(L"path=\"{}\"", pending.request.rootPath));
     ActivateRequest(*pending.observer, pending.requestId);
@@ -354,6 +389,8 @@ void RPCScanEngine::StartPendingRequestIfAny()
 void RPCScanEngine::ResetRequestLifecycle()
 {
     const std::uint64_t requestId = m_activeRequestId.load(std::memory_order_acquire);
+    ASSERT(requestId != 0);
+    ASSERT(GetActiveObserver() != nullptr);
     {
         std::scoped_lock lock(m_observerMutex);
         m_activeObserver = nullptr;
@@ -364,6 +401,8 @@ void RPCScanEngine::ResetRequestLifecycle()
     m_requestInputClosed.store(true, std::memory_order_release);
     m_cancelRequested.store(false, std::memory_order_release);
     m_running.store(false, std::memory_order_release);
+    ASSERT(m_activeRequestId.load(std::memory_order_acquire) == 0);
+    ASSERT(GetActiveObserver() == nullptr);
     RpcClientLog(requestId, L"RequestReset",
         L"outstanding=0 inputClosed=1 cancelPending=0 running=0");
 }
@@ -373,6 +412,8 @@ void RPCScanEngine::TryCloseRequestInput(const std::uint64_t requestId)
     if (!IsCurrentRequest(requestId))
         return;
 
+    ASSERT(requestId != 0);
+    ASSERT(m_outstandingWorkItems.load(std::memory_order_acquire) == 0);
     if (m_requestInputClosed.exchange(true, std::memory_order_acq_rel))
         return;
 
@@ -395,6 +436,7 @@ void RPCScanEngine::FailActiveRequestForTransport(const unsigned long errorCode,
     if (requestId == 0)
         return;
 
+    ASSERT(GetActiveObserver() != nullptr);
     if (m_terminalResolved.exchange(true, std::memory_order_acq_rel))
         return;
 
