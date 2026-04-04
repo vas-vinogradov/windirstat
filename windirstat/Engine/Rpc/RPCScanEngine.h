@@ -6,6 +6,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 class RPCScanEngine final
     : public IScanEngine
@@ -24,21 +25,33 @@ public:
     std::uint64_t GetActiveRequestId() const override;
 
 private:
+    struct PendingStart
+    {
+        ScanRequest request{};
+        IScanObserver* observer = nullptr;
+        std::uint64_t requestId = 0;
+    };
+
     void OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& event) override;
     void OnRemoteScanCompleted(const RpcScanCompletedEvent& event) override;
     void OnRemoteScanCanceled(const RpcScanCanceledEvent& event) override;
     void OnRemoteScanFailed(const RpcScanFailedEvent& event) override;
     void OnTransportFailure(unsigned long errorCode, const std::wstring& message) override;
 
+    void ActivateRequest(IScanObserver& observer, std::uint64_t requestId);
+    void StartPendingRequestIfAny();
     void ResetRequestLifecycle();
     void TryCloseRequestInput(std::uint64_t requestId);
     void FailActiveRequestForTransport(unsigned long errorCode, const std::wstring& message);
     bool IsCurrentRequest(std::uint64_t requestId) const;
-    IScanObserver* GetObserver() const;
+    IScanObserver* GetActiveObserver() const;
+    PendingStart TakePendingStart();
 
     std::unique_ptr<IRpcTransportClient> m_transportClient;
+    mutable std::mutex m_stateMutex;
     mutable std::mutex m_observerMutex;
-    IScanObserver* m_observer = nullptr;
+    IScanObserver* m_activeObserver = nullptr;
+    std::optional<PendingStart> m_pendingStart;
     std::atomic_uint64_t m_nextRequestId = 1;
     std::atomic_uint64_t m_activeRequestId = 0;
     std::atomic_uint32_t m_outstandingWorkItems = 0;
