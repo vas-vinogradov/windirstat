@@ -239,13 +239,13 @@
     <ClInclude Include="Pages\PagePrompts.h">
       <Filter>Header Files\User Interface\Pages</Filter>
     </ClInclude>
+    <ClInclude Include="RemoteStub\BasicReplacementDiscoveryEngine.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
     <ClInclude Include="RemoteStub\RemoteScanHost.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="RemoteStub\NamedPipeRpcServer.h">
-      <Filter>Header Files\RemoteStub</Filter>
-    </ClInclude>
-    <ClInclude Include="RemoteStub\RemoteStubCommandLine.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="RemoteStub\StubDirectoryDiscoveryEngine.h">
@@ -383,6 +383,9 @@
     <ClInclude Include="DiscoveryBatch.h">
       <Filter>Header Files\Engine\Scanning\Discovery</Filter>
     </ClInclude>
+    <ClInclude Include="DirectoryDiscoveryEngine.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
     <ClInclude Include="DirectoryProgressBatch.h">
       <Filter>Header Files\Contracts</Filter>
     </ClInclude>
@@ -400,9 +403,6 @@
     </ClInclude>
     <ClInclude Include="ScanTask.h">
       <Filter>Header Files\Engine\Scanning\Pipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="LegacyDiscoveryRequest.h">
-      <Filter>Header Files\Engine\Scanning</Filter>
     </ClInclude>
     <ClInclude Include="FileSystem.h">
       <Filter>Header Files\Core\Helpers</Filter>
@@ -498,18 +498,6 @@
     </ClCompile>
     <ClCompile Include="Pages\PagePrompts.cpp">
       <Filter>Source Files\User Interface\Pages</Filter>
-    </ClCompile>
-    <ClCompile Include="RemoteStub\RemoteScanHost.cpp">
-      <Filter>Source Files\RemoteStub</Filter>
-    </ClCompile>
-    <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp">
-      <Filter>Source Files\RemoteStub</Filter>
-    </ClCompile>
-    <ClCompile Include="RemoteStub\RemoteStubCommandLine.cpp">
-      <Filter>Source Files\RemoteStub</Filter>
-    </ClCompile>
-    <ClCompile Include="RemoteStub\StubDirectoryDiscoveryEngine.cpp">
-      <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
     <ClCompile Include="Controls\FileWatcherControl.cpp">
       <Filter>Source Files\User Interface\Controls</Filter>

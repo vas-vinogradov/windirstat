@@ -16,7 +16,6 @@
 //
 
 #include "pch.h"
-#include "RemoteStub/RemoteStubCommandLine.h"
 #include "SelectDrivesDlg.h"
 #include "AboutDlg.h"
 #include "TreeMapView.h"
@@ -234,6 +233,8 @@ class CWinDirStatCommandLineInfo final : public CCommandLineInfo
     const std::wstring saveToCSVFlag = L"savetocsv";
     const std::wstring saveDupesToCSVFlag = L"savedupestocsv";
     const std::wstring loadFromCSVFlag = L"loadfromcsv";
+    const std::wstring scanEngineFlag = L"scan-engine";
+    const std::wstring rpcLogLevelFlag = L"rpc-log-level";
     const std::wstring legacyUninstallFlag = L"legacyuninstall";
 
 public:
@@ -264,6 +265,16 @@ public:
             {
                 CDirStatApp::Get()->m_loadFromCsvPath = param;
             }
+            else if (m_pendingFlag == scanEngineFlag)
+            {
+                // Consumed only to keep the elevated relaunch flag from being
+                // misinterpreted as a scan path by the normal document parser.
+            }
+            else if (m_pendingFlag == rpcLogLevelFlag)
+            {
+                // Consumed only to keep the RPC logging flag from being
+                // misinterpreted as a scan path by the normal document parser.
+            }
             
             m_pendingFlag.clear();
             return;
@@ -284,7 +295,8 @@ public:
 
         // Handle flags
         param = MakeLower(param);
-        if (param == saveToCSVFlag || param == saveDupesToCSVFlag || param == loadFromCSVFlag)
+        if (param == saveToCSVFlag || param == saveDupesToCSVFlag || param == loadFromCSVFlag ||
+            param == scanEngineFlag || param == rpcLogLevelFlag)
         {
             m_pendingFlag = param;
         }
@@ -297,11 +309,6 @@ public:
 
 BOOL CDirStatApp::InitInstance()
 {
-    if (TryRunRemoteStubFromCommandLine())
-    {
-        return FALSE;
-    }
-
     // Prevent state saving
     m_bSaveState = FALSE;
 

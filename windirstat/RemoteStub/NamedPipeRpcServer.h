@@ -12,6 +12,7 @@ public:
     ~NamedPipeRpcServer();
 
     bool Listen();
+    bool HasPendingRequestMessage() const;
     std::optional<RpcRequestMessage> ReadRequestMessage();
     std::optional<RpcRequestMessage> ReadRequestMessage(DWORD timeoutMs);
     bool SendEventMessage(const RpcEventMessage& message);

@@ -21,6 +21,10 @@ public:
     virtual void Suspend() = 0;
     virtual void Resume() = 0;
     virtual bool IsRunning() const = 0;
+    // Returns true when the engine owns recursive traversal internally after
+    // the initial request inputs are submitted. Engines returning false still
+    // expect the observer/UI side to enqueue followed child directories.
+    virtual bool OwnsTraversal() const { return false; }
     // Returns the authoritative active requestId, or 0 when no active scan is
     // running. UI may use this to reject stale callbacks.
     virtual std::uint64_t GetActiveRequestId() const = 0;

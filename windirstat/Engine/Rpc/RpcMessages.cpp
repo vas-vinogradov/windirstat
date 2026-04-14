@@ -393,7 +393,10 @@ std::string SerializeRpcRequestMessage(const RpcRequestMessage& message)
     {
         return std::string("{\"kind\":\"StartScanRequest\",\"requestId\":") +
             std::to_string(startScan->requestId) +
-            ",\"rootPath\":\"" + EscapeJsonString(startScan->rootPath) + "\"}";
+            ",\"rootPath\":\"" + EscapeJsonString(startScan->rootPath) +
+            "\",\"followMountPoints\":" + SerializeJsonBool(startScan->followMountPoints) +
+            ",\"followSymbolicLinks\":" + SerializeJsonBool(startScan->followSymbolicLinks) +
+            ",\"followJunctions\":" + SerializeJsonBool(startScan->followJunctions) + "}";
     }
 
     if (const auto* enqueue = std::get_if<RpcEnqueueRequest>(&message))
@@ -458,12 +461,19 @@ std::optional<RpcRequestMessage> TryDeserializeRpcRequestMessage(const std::stri
     if (kindOpt.value() == "StartScanRequest")
     {
         const auto rootPathOpt = ExtractJsonStringField(json, "rootPath");
-        if (!rootPathOpt.has_value())
+        const auto followMountPointsOpt = ExtractJsonBoolField(json, "followMountPoints");
+        const auto followSymbolicLinksOpt = ExtractJsonBoolField(json, "followSymbolicLinks");
+        const auto followJunctionsOpt = ExtractJsonBoolField(json, "followJunctions");
+        if (!rootPathOpt.has_value() || !followMountPointsOpt.has_value() ||
+            !followSymbolicLinksOpt.has_value() || !followJunctionsOpt.has_value())
             return std::nullopt;
 
         RpcStartScanRequest request{};
         request.requestId = requestIdOpt.value();
         request.rootPath = Utf8ToWide(rootPathOpt.value());
+        request.followMountPoints = followMountPointsOpt.value();
+        request.followSymbolicLinks = followSymbolicLinksOpt.value();
+        request.followJunctions = followJunctionsOpt.value();
         return RpcRequestMessage(request);
     }
 

@@ -127,7 +127,8 @@ void CItemScanObserver::OnDirectoryProgress(DirectoryProgressBatch batch)
         const bool follow = !directory.isProtectedReparsePoint &&
             CDirStatApp::Get()->IsFollowingAllowed(directory.reparseTag);
         CItem* newitem = item->AddDirectoryFromDiscovery(directory, follow);
-        if (follow && IsActiveRequest(batch.requestId))
+        const IScanEngine* const engine = m_doc.GetScanEngine();
+        if (follow && IsActiveRequest(batch.requestId) && engine != nullptr && !engine->OwnsTraversal())
         {
             ScanRequest request{};
             request.requestId = batch.requestId;

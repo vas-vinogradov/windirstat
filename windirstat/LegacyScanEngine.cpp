@@ -5,7 +5,6 @@
 #include "Options.h"
 #include "DirectoryProgressBatch.h"
 #include "IScanObserver.h"
-#include "LegacyDiscoveryRequest.h"
 
 class LegacyScanEngine::ScanJob
 {
@@ -117,12 +116,10 @@ void LegacyScanEngine::ProcessDirectory(
 {
     try
     {
-        LegacyDiscoveryRequest legacyRequest{};
-        legacyRequest.path = request.rootPath;
-        legacyRequest.ntfsContext = &m_contextNtfs;
-        legacyRequest.basicContext = &m_contextBasic;
+        DirectoryDiscoveryRequest discoveryRequest{};
+        discoveryRequest.path = request.rootPath;
 
-        DiscoveryBatch discoveryBatch = m_discoveryEngine.Discover(legacyRequest);
+        DiscoveryBatch discoveryBatch = m_discoveryEngine.Discover(discoveryRequest);
 
         DirectoryProgressBatch progressBatch{};
         progressBatch.requestId = request.requestId;

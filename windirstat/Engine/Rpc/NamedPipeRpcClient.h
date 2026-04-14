@@ -21,8 +21,9 @@ public:
 
 private:
     bool EnsureConnected();
-    bool StartRemoteHost();
-    bool ConnectPipe();
+    bool EnsureHostRunning();
+    bool WaitUntilHostReady();
+    bool ConnectToHost();
     bool SendJsonMessage(const std::string& json);
     std::optional<std::string> ReadJsonMessage();
     void ReaderLoop();
@@ -31,8 +32,12 @@ private:
     void StopRemoteHost();
     void DispatchEvent(const RpcEventMessage& event);
     static std::wstring CreatePipeName();
+    static std::wstring CreateHostLogFilePath();
+    static bool IsVerboseLoggingEnabled();
+    static std::wstring GetRemoteHostExecutablePath();
 
     std::wstring m_pipeName;
+    std::wstring m_hostLogFilePath;
     HANDLE m_pipe = INVALID_HANDLE_VALUE;
     PROCESS_INFORMATION m_processInfo{};
     mutable std::mutex m_ioMutex;
@@ -43,4 +48,5 @@ private:
     std::atomic_bool m_shutdownRequested = false;
     std::atomic_bool m_readerRunning = false;
     std::atomic_bool m_transportFailureNotified = false;
+    bool m_verboseLogging = false;
 };

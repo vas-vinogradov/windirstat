@@ -7,6 +7,22 @@
 
 namespace
 {
+bool IsRpcVerboseLoggingEnabled()
+{
+    for (int index = 1; index < __argc; ++index)
+    {
+        const std::wstring arg = __wargv[index];
+        if (arg == L"--rpc-log-level" && index + 1 < __argc)
+        {
+            std::wstring value = __wargv[++index];
+            _wcslwr_s(value.data(), value.size() + 1);
+            return value == L"verbose";
+        }
+    }
+
+    return false;
+}
+
 std::wstring RpcTimestamp()
 {
     SYSTEMTIME now{};
@@ -16,8 +32,15 @@ std::wstring RpcTimestamp()
         now.wHour, now.wMinute, now.wSecond, now.wMilliseconds);
 }
 
-void RpcClientLog(std::uint64_t requestId, std::wstring_view event, std::wstring_view details = {})
+void RpcClientLog(
+    const std::uint64_t requestId,
+    const std::wstring_view event,
+    const std::wstring_view details = {},
+    const bool verboseOnly = false)
 {
+    if (verboseOnly && !IsRpcVerboseLoggingEnabled())
+        return;
+
     std::wstring line = std::format(L"[RPC][CLIENT] ts={} request={} event={}",
         RpcTimestamp(), requestId, event);
     if (!details.empty())
@@ -25,6 +48,34 @@ void RpcClientLog(std::uint64_t requestId, std::wstring_view event, std::wstring
 
     line += L"\n";
     OutputDebugStringW(line.c_str());
+}
+
+void RpcClientTrace(
+    const std::uint64_t requestId,
+    const std::wstring_view event,
+    const std::wstring_view details = {},
+    const bool verboseOnly = false)
+{
+    if (verboseOnly && !IsRpcVerboseLoggingEnabled())
+        return;
+
+    if (details.empty())
+    {
+        VTRACE(L"[RPC][CLIENT] request={} event={}", requestId, event);
+        return;
+    }
+
+    VTRACE(L"[RPC][CLIENT] request={} event={} {}", requestId, event, details);
+}
+
+void RpcClientLifecycleLog(
+    const std::uint64_t requestId,
+    const std::wstring_view event,
+    const std::wstring_view details = {},
+    const bool verboseOnly = false)
+{
+    RpcClientLog(requestId, event, details, verboseOnly);
+    RpcClientTrace(requestId, event, details, verboseOnly);
 }
 }
 
@@ -66,12 +117,14 @@ void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observe
             m_pendingStart = PendingStart{ request, &observer, requestId };
             ASSERT(m_pendingStart->requestId != 0);
             requestToCancel = activeRequestId;
-            RpcClientLog(requestId, L"ReplacementQueued",
+            RpcClientLifecycleLog(requestId, L"ReplacementQueued",
                 std::format(L"replaces={} path=\"{}\"", activeRequestId, request.rootPath));
         }
         else
         {
             ActivateRequest(observer, requestId);
+            if (request.expectMoreInputs)
+                RecordExternalInputPath(request.rootPath);
             startImmediately = true;
         }
     }
@@ -89,7 +142,7 @@ void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observe
         RpcCancelScanRequest cancelRequest{};
         cancelRequest.requestId = requestToCancel;
         cancelRequest.reason = ScanTerminalReason::Restarted;
-        RpcClientLog(requestToCancel, L"CancelRequested",
+        RpcClientLifecycleLog(requestToCancel, L"CancelRequested",
             std::format(L"reason={} replacement={}", static_cast<int>(cancelRequest.reason), requestId));
 
         if (m_transportClient != nullptr && m_transportClient->SendCancelScan(cancelRequest))
@@ -102,10 +155,19 @@ void RPCScanEngine::StartScan(const ScanRequest& request, IScanObserver& observe
     RpcStartScanRequest startRequest{};
     startRequest.requestId = requestId;
     startRequest.rootPath = request.rootPath;
-    RpcClientLog(requestId, L"StartScanInvoked", std::format(L"path=\"{}\"", request.rootPath));
+    startRequest.followMountPoints = !COptions::ExcludeVolumeMountPoints;
+    startRequest.followSymbolicLinks = !COptions::ExcludeSymbolicLinksDirectory;
+    startRequest.followJunctions = !COptions::ExcludeJunctions;
+    RpcClientLifecycleLog(requestId, L"StartScanInvoked", std::format(L"path=\"{}\"", request.rootPath));
 
     if (m_transportClient != nullptr && m_transportClient->SendStartScan(startRequest))
+    {
+        RpcClientLifecycleLog(requestId, L"StartScanSent",
+            std::format(L"path=\"{}\" expectMoreInputs={}", request.rootPath, request.expectMoreInputs ? 1 : 0));
+        if (!request.expectMoreInputs)
+            TryCloseRequestInput(requestId);
         return;
+    }
 
     FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send StartScan over RPC transport.");
 }
@@ -128,13 +190,14 @@ void RPCScanEngine::Enqueue(const ScanRequest& request)
     ASSERT(activeRequestId != 0);
     ASSERT(!m_requestInputClosed.load(std::memory_order_acquire));
     ASSERT(GetActiveObserver() != nullptr);
-    m_outstandingWorkItems.fetch_add(1, std::memory_order_acq_rel);
+    RecordExternalInputPath(request.rootPath);
 
     RpcEnqueueRequest enqueueRequest{};
     enqueueRequest.requestId = activeRequestId;
     enqueueRequest.rootPath = request.rootPath;
-    RpcClientLog(activeRequestId, L"EnqueueSent",
-        std::format(L"path=\"{}\" outstanding={}", request.rootPath, m_outstandingWorkItems.load(std::memory_order_acquire)));
+    RpcClientLifecycleLog(activeRequestId, L"EnqueueSent",
+        std::format(L"path=\"{}\" outstanding={}", request.rootPath, m_outstandingWorkItems.load(std::memory_order_acquire)),
+        true);
 
     if (m_transportClient != nullptr)
     {
@@ -142,7 +205,7 @@ void RPCScanEngine::Enqueue(const ScanRequest& request)
             return;
     }
 
-    m_outstandingWorkItems.fetch_sub(1, std::memory_order_acq_rel);
+    UndoExternalInputPath(request.rootPath);
     FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send Enqueue over RPC transport.");
 }
 
@@ -166,7 +229,7 @@ void RPCScanEngine::Cancel(const ScanTerminalReason reason)
     RpcCancelScanRequest cancelRequest{};
     cancelRequest.requestId = requestId;
     cancelRequest.reason = reason;
-    RpcClientLog(requestId, L"CancelRequested",
+    RpcClientLifecycleLog(requestId, L"CancelRequested",
         std::format(L"reason={}", static_cast<int>(reason)));
 
     if (m_transportClient != nullptr)
@@ -203,10 +266,11 @@ void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& e
 
     ASSERT(event.requestId != 0);
     ASSERT(GetActiveObserver() != nullptr);
-    RpcClientLog(event.requestId, L"DirectoryProgressReceived",
+    RpcClientLifecycleLog(event.requestId, L"DirectoryProgressReceived",
         std::format(L"path=\"{}\" finished={} outstanding={}",
             event.directoryPath, event.finished ? 1 : 0,
-            m_outstandingWorkItems.load(std::memory_order_acquire)));
+            m_outstandingWorkItems.load(std::memory_order_acquire)),
+        true);
 
     IScanObserver* const observer = GetActiveObserver();
     if (observer == nullptr)
@@ -220,16 +284,36 @@ void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& e
     batch.finished = event.finished;
     observer->OnDirectoryProgress(std::move(batch));
 
-    if (event.finished)
-    {
-        const std::uint32_t current = m_outstandingWorkItems.load(std::memory_order_acquire);
-        ASSERT(current > 0);
-        if (current == 0)
-            return;
+    if (!event.finished)
+        return;
 
-        const std::uint32_t remaining = m_outstandingWorkItems.fetch_sub(1, std::memory_order_acq_rel) - 1;
+    const bool completedTrackedInput = CompleteExternalInputPath(event.directoryPath);
+    RpcClientLifecycleLog(event.requestId, L"ExternalInputCompletionAudit",
+        std::format(L"path=\"{}\" matchedTrackedInput={} state={}",
+            event.directoryPath,
+            completedTrackedInput ? 1 : 0,
+            DescribeExternalInputState()));
+
+    if (completedTrackedInput)
+    {
+        const std::uint32_t remaining = m_outstandingWorkItems.load(std::memory_order_acquire);
         if (remaining == 0 && !m_cancelRequested.load(std::memory_order_acquire))
+        {
+            RpcClientLifecycleLog(event.requestId, L"CloseRequestInputAudit",
+                std::format(L"action=SendClose path=\"{}\" state={}",
+                    event.directoryPath, DescribeExternalInputState()));
             TryCloseRequestInput(event.requestId);
+        }
+        else
+        {
+            RpcClientLifecycleLog(event.requestId, L"CloseRequestInputAudit",
+                std::format(L"action=Deferred path=\"{}\" remaining={} cancelPending={} inputClosed={} state={}",
+                    event.directoryPath,
+                    remaining,
+                    m_cancelRequested.load(std::memory_order_acquire) ? 1 : 0,
+                    m_requestInputClosed.load(std::memory_order_acquire) ? 1 : 0,
+                    DescribeExternalInputState()));
+        }
     }
 }
 
@@ -244,12 +328,12 @@ void RPCScanEngine::OnRemoteScanCompleted(const RpcScanCompletedEvent& event)
 
     IScanObserver* const observer = GetActiveObserver();
     ASSERT(observer != nullptr);
-    RpcClientLog(event.requestId, L"TerminalReceived", L"terminal=Completed");
-    ResetRequestLifecycle();
+    RpcClientLifecycleLog(event.requestId, L"TerminalReceived", L"terminal=Completed");
 
     if (observer != nullptr)
         observer->OnCompleted(event.requestId);
 
+    ResetRequestLifecycle();
     StartPendingRequestIfAny();
 }
 
@@ -264,13 +348,13 @@ void RPCScanEngine::OnRemoteScanCanceled(const RpcScanCanceledEvent& event)
 
     IScanObserver* const observer = GetActiveObserver();
     ASSERT(observer != nullptr);
-    RpcClientLog(event.requestId, L"TerminalReceived",
+    RpcClientLifecycleLog(event.requestId, L"TerminalReceived",
         std::format(L"terminal=Canceled reason={}", static_cast<int>(event.reason)));
-    ResetRequestLifecycle();
 
     if (observer != nullptr)
         observer->OnCanceled(event.requestId, event.reason);
 
+    ResetRequestLifecycle();
     StartPendingRequestIfAny();
 }
 
@@ -287,10 +371,9 @@ void RPCScanEngine::OnRemoteScanFailed(const RpcScanFailedEvent& event)
     ASSERT(observer != nullptr);
     // Wire-level "failed" currently means error details for the active request.
     // The observer contract remains OnError(...) followed by terminal canceled.
-    RpcClientLog(event.requestId, L"TerminalReceived",
+    RpcClientLifecycleLog(event.requestId, L"TerminalReceived",
         std::format(L"terminal=Failed path=\"{}\" errorCode={} message=\"{}\"",
             event.path, event.errorCode, event.message));
-    ResetRequestLifecycle();
 
     if (observer != nullptr)
     {
@@ -303,6 +386,7 @@ void RPCScanEngine::OnRemoteScanFailed(const RpcScanFailedEvent& event)
         observer->OnCanceled(event.requestId, ScanTerminalReason::EngineInterrupted);
     }
 
+    ResetRequestLifecycle();
     StartPendingRequestIfAny();
 }
 
@@ -310,7 +394,7 @@ void RPCScanEngine::OnTransportFailure(const unsigned long errorCode, const std:
 {
     const std::uint64_t requestId = m_activeRequestId.load(std::memory_order_acquire);
     ASSERT(requestId == 0 || GetActiveObserver() != nullptr);
-    RpcClientLog(requestId, L"TransportFailure",
+    RpcClientLifecycleLog(requestId, L"TransportFailure",
         std::format(L"errorCode={} message=\"{}\"", errorCode, message));
     FailActiveRequestForTransport(errorCode, message);
 }
@@ -341,12 +425,12 @@ void RPCScanEngine::ActivateRequest(IScanObserver& observer, const std::uint64_t
     }
 
     m_activeRequestId.store(requestId, std::memory_order_release);
-    m_outstandingWorkItems.store(1, std::memory_order_release);
+    m_outstandingWorkItems.store(0, std::memory_order_release);
     m_requestInputClosed.store(false, std::memory_order_release);
     m_cancelRequested.store(false, std::memory_order_release);
     m_terminalResolved.store(false, std::memory_order_release);
     m_running.store(true, std::memory_order_release);
-    RpcClientLog(requestId, L"RequestActivated",
+    RpcClientLifecycleLog(requestId, L"RequestActivated",
         std::format(L"outstanding={} inputClosed=0 cancelPending=0", m_outstandingWorkItems.load(std::memory_order_acquire)));
 }
 
@@ -372,16 +456,27 @@ void RPCScanEngine::StartPendingRequestIfAny()
     ASSERT(m_activeRequestId.load(std::memory_order_acquire) == 0);
     ASSERT(!m_running.load(std::memory_order_acquire));
     ASSERT(GetActiveObserver() == nullptr);
-    RpcClientLog(pending.requestId, L"PendingRequestPromotion",
+    RpcClientLifecycleLog(pending.requestId, L"PendingRequestPromotion",
         std::format(L"path=\"{}\"", pending.request.rootPath));
     ActivateRequest(*pending.observer, pending.requestId);
+    if (pending.request.expectMoreInputs)
+        RecordExternalInputPath(pending.request.rootPath);
 
     RpcStartScanRequest startRequest{};
     startRequest.requestId = pending.requestId;
     startRequest.rootPath = pending.request.rootPath;
+    startRequest.followMountPoints = !COptions::ExcludeVolumeMountPoints;
+    startRequest.followSymbolicLinks = !COptions::ExcludeSymbolicLinksDirectory;
+    startRequest.followJunctions = !COptions::ExcludeJunctions;
 
     if (m_transportClient != nullptr && m_transportClient->SendStartScan(startRequest))
+    {
+        RpcClientLifecycleLog(pending.requestId, L"StartScanSent",
+            std::format(L"path=\"{}\" expectMoreInputs={}", pending.request.rootPath, pending.request.expectMoreInputs ? 1 : 0));
+        if (!pending.request.expectMoreInputs)
+            TryCloseRequestInput(pending.requestId);
         return;
+    }
 
     FailActiveRequestForTransport(ERROR_BROKEN_PIPE, L"Failed to send StartScan over RPC transport.");
 }
@@ -397,14 +492,122 @@ void RPCScanEngine::ResetRequestLifecycle()
     }
 
     m_activeRequestId.store(0, std::memory_order_release);
-    m_outstandingWorkItems.store(0, std::memory_order_release);
+    ResetExternalInputTracking();
     m_requestInputClosed.store(true, std::memory_order_release);
     m_cancelRequested.store(false, std::memory_order_release);
     m_running.store(false, std::memory_order_release);
     ASSERT(m_activeRequestId.load(std::memory_order_acquire) == 0);
     ASSERT(GetActiveObserver() == nullptr);
-    RpcClientLog(requestId, L"RequestReset",
-        L"outstanding=0 inputClosed=1 cancelPending=0 running=0");
+    RpcClientLifecycleLog(requestId, L"RequestReset",
+        L"outstanding=0 inputClosed=1 cancelPending=0 running=0",
+        true);
+}
+
+void RPCScanEngine::RecordExternalInputPath(const std::wstring& path)
+{
+    ASSERT(!path.empty());
+    std::scoped_lock lock(m_inputTrackingMutex);
+    ++m_pendingInputPaths[path];
+    const std::uint32_t outstanding = m_outstandingWorkItems.fetch_add(1, std::memory_order_acq_rel) + 1;
+    RpcClientLifecycleLog(m_activeRequestId.load(std::memory_order_acquire), L"ExternalInputRecorded",
+        std::format(L"path=\"{}\" pendingForPath={} outstanding={} trackedPaths={}",
+            path,
+            m_pendingInputPaths[path],
+            outstanding,
+            m_pendingInputPaths.size()));
+}
+
+void RPCScanEngine::UndoExternalInputPath(const std::wstring& path)
+{
+    ASSERT(!path.empty());
+    std::wstring state;
+    std::scoped_lock lock(m_inputTrackingMutex);
+    const auto it = m_pendingInputPaths.find(path);
+    ASSERT(it != m_pendingInputPaths.end());
+    if (it == m_pendingInputPaths.end())
+        return;
+
+    ASSERT(it->second > 0);
+    if (--it->second == 0)
+        m_pendingInputPaths.erase(it);
+
+    const std::uint32_t outstanding = m_outstandingWorkItems.load(std::memory_order_acquire);
+    ASSERT(outstanding > 0);
+    if (outstanding > 0)
+        m_outstandingWorkItems.fetch_sub(1, std::memory_order_acq_rel);
+    state = DescribeExternalInputStateLocked();
+
+    RpcClientLifecycleLog(m_activeRequestId.load(std::memory_order_acquire), L"ExternalInputUndo",
+        std::format(L"path=\"{}\" state={}", path, state),
+        true);
+}
+
+bool RPCScanEngine::CompleteExternalInputPath(const std::wstring& path)
+{
+    ASSERT(!path.empty());
+    std::wstring state;
+    std::scoped_lock lock(m_inputTrackingMutex);
+    const auto it = m_pendingInputPaths.find(path);
+    if (it == m_pendingInputPaths.end())
+    {
+        RpcClientLifecycleLog(m_activeRequestId.load(std::memory_order_acquire), L"ExternalInputNoMatch",
+            std::format(L"path=\"{}\" outstanding={} trackedPaths={}",
+                path,
+                m_outstandingWorkItems.load(std::memory_order_acquire),
+                m_pendingInputPaths.size()),
+            true);
+        return false;
+    }
+
+    ASSERT(it->second > 0);
+    if (--it->second == 0)
+        m_pendingInputPaths.erase(it);
+
+    const std::uint32_t outstanding = m_outstandingWorkItems.load(std::memory_order_acquire);
+    ASSERT(outstanding > 0);
+    if (outstanding > 0)
+        m_outstandingWorkItems.fetch_sub(1, std::memory_order_acq_rel);
+    state = DescribeExternalInputStateLocked();
+
+    RpcClientLifecycleLog(m_activeRequestId.load(std::memory_order_acquire), L"ExternalInputCompleted",
+        std::format(L"path=\"{}\" state={}", path, state),
+        false);
+
+    return true;
+}
+
+void RPCScanEngine::ResetExternalInputTracking()
+{
+    std::scoped_lock lock(m_inputTrackingMutex);
+    m_pendingInputPaths.clear();
+    m_outstandingWorkItems.store(0, std::memory_order_release);
+}
+
+std::wstring RPCScanEngine::DescribeExternalInputState() const
+{
+    std::scoped_lock lock(m_inputTrackingMutex);
+    return DescribeExternalInputStateLocked();
+}
+
+std::wstring RPCScanEngine::DescribeExternalInputStateLocked() const
+{
+    std::wstring samplePaths;
+    std::size_t emitted = 0;
+    for (const auto& [path, count] : m_pendingInputPaths)
+    {
+        if (emitted > 0)
+            samplePaths += L";";
+
+        samplePaths += std::format(L"\"{}\"x{}", path, count);
+        ++emitted;
+        if (emitted == 3)
+            break;
+    }
+
+    return std::format(L"outstanding={} trackedPaths={} samples=[{}]",
+        m_outstandingWorkItems.load(std::memory_order_acquire),
+        m_pendingInputPaths.size(),
+        samplePaths);
 }
 
 void RPCScanEngine::TryCloseRequestInput(const std::uint64_t requestId)
@@ -415,11 +618,16 @@ void RPCScanEngine::TryCloseRequestInput(const std::uint64_t requestId)
     ASSERT(requestId != 0);
     ASSERT(m_outstandingWorkItems.load(std::memory_order_acquire) == 0);
     if (m_requestInputClosed.exchange(true, std::memory_order_acq_rel))
+    {
+        RpcClientLifecycleLog(requestId, L"CloseRequestInputAudit",
+            std::format(L"action=SkipAlreadyClosed state={}", DescribeExternalInputState()),
+            false);
         return;
+    }
 
     RpcCloseRequestInput closeRequest{};
     closeRequest.requestId = requestId;
-    RpcClientLog(requestId, L"CloseRequestInputSent",
+    RpcClientLifecycleLog(requestId, L"CloseRequestInputSent",
         std::format(L"outstanding={}", m_outstandingWorkItems.load(std::memory_order_acquire)));
     if (m_transportClient != nullptr)
     {
@@ -441,7 +649,6 @@ void RPCScanEngine::FailActiveRequestForTransport(const unsigned long errorCode,
         return;
 
     IScanObserver* const observer = GetActiveObserver();
-    ResetRequestLifecycle();
 
     if (observer != nullptr)
     {
@@ -454,5 +661,6 @@ void RPCScanEngine::FailActiveRequestForTransport(const unsigned long errorCode,
         observer->OnCanceled(requestId, ScanTerminalReason::EngineInterrupted);
     }
 
+    ResetRequestLifecycle();
     StartPendingRequestIfAny();
 }

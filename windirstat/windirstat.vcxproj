@@ -13,6 +13,10 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="DebugVerbose|x64">
+      <Configuration>DebugVerbose</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|ARM64">
       <Configuration>Release</Configuration>
       <Platform>ARM64</Platform>
@@ -41,6 +45,13 @@
     <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+    <UseOfMfc>Static</UseOfMfc>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugVerbose|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
@@ -99,6 +110,9 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DebugVerbose|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -115,12 +129,19 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <WinDirStatDevCodeSignThumbprint>8C8B4D2663807DB994391C7A00AFF36CC8A786CC</WinDirStatDevCodeSignThumbprint>
+    <WinDirStatSignToolPath>C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe</WinDirStatSignToolPath>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)build\</OutDir>
     <IntDir>$(SolutionDir)intermediate\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <TargetName>WinDirStat_$(PlatformShortName.ToLower())</TargetName>
     <TargetExt>.exe</TargetExt>
     <LinkIncremental>true</LinkIncremental>
+    <LocalDebuggerEnvironment>WINDIRSTAT_SCAN_ENGINE=rpc
+$(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)build\</OutDir>
@@ -128,6 +149,20 @@
     <TargetName>WinDirStat_$(PlatformShortName.ToLower())</TargetName>
     <TargetExt>.exe</TargetExt>
     <LinkIncremental>true</LinkIncremental>
+    <LocalDebuggerEnvironment>WINDIRSTAT_SCAN_ENGINE=rpc
+$(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugVerbose|x64'">
+    <OutDir>$(SolutionDir)build\</OutDir>
+    <IntDir>$(SolutionDir)intermediate\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>WinDirStat_$(PlatformShortName.ToLower())</TargetName>
+    <TargetExt>.exe</TargetExt>
+    <LinkIncremental>true</LinkIncremental>
+    <LocalDebuggerEnvironment>WINDIRSTAT_SCAN_ENGINE=rpc
+$(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+    <LocalDebuggerCommandArguments>--rpc-log-level verbose</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <IntDir>$(SolutionDir)intermediate\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
@@ -135,6 +170,9 @@
     <TargetExt>.exe</TargetExt>
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\</OutDir>
+    <LocalDebuggerEnvironment>WINDIRSTAT_SCAN_ENGINE=rpc
+$(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)build\</OutDir>
@@ -244,6 +282,60 @@
     <PreBuildEvent>
       <Command>POWERSHELL.EXE -NoLogo -ExecutionPolicy Unrestricted -NoProfile -File "$(ProjectDir)Build\Compress Strings.ps1" -Path "$(ProjectDir)res"</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Thumbprint -eq '$(WinDirStatDevCodeSignThumbprint)' } | Select-Object -First 1; if (-not $cert) { Write-Error 'WinDirStat dev code-signing cert not found in CurrentUser\\My.'; exit 1 }; &amp; '$(WinDirStatSignToolPath)' sign /fd SHA256 /sha1 $(WinDirStatDevCodeSignThumbprint) '$(TargetPath)'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"</Command>
+    </PostBuildEvent>
+    <Manifest>
+      <AdditionalManifestFiles>res\windirstat.manifest</AdditionalManifestFiles>
+      <EnableDpiAwareness>false</EnableDpiAwareness>
+    </Manifest>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugVerbose|x64'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(ProjectDir);$(ProjectDir)Controls\;$(ProjectDir)Dialogs\;$(ProjectDir)Pages\;$(ProjectDir)Views\;$(ProjectDir)Res\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;WINVER=_WIN32_WINNT_WIN7;_WIN32_WINNT=_WIN32_WINNT_WIN7;_ALLOW_RTCc_IN_STL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <SmallerTypeCheck>false</SmallerTypeCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/utf-8 $(ExternalCompilerOptions)</AdditionalOptions>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4324</DisableSpecificWarnings>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;WINVER=0x0601;_WIN32_WINNT=0x0601;_ALLOW_RTCc_IN_STL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..;.;Controls;Dialogs;..;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
+      <AdditionalDependencies>delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(OutDir)$(TargetName).exe</OutputFile>
+      <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalOptions>/pdbaltpath:%_PDB% /nodefaultlib:libcmt %(AdditionalOptions)</AdditionalOptions>
+      <Profile>false</Profile>
+    </Link>
+    <PreBuildEvent>
+      <Command>POWERSHELL.EXE -NoLogo -ExecutionPolicy Unrestricted -NoProfile -File "$(ProjectDir)Build\Compress Strings.ps1" -Path "$(ProjectDir)res"</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Thumbprint -eq '$(WinDirStatDevCodeSignThumbprint)' } | Select-Object -First 1; if (-not $cert) { Write-Error 'WinDirStat dev code-signing cert not found in CurrentUser\\My.'; exit 1 }; &amp; '$(WinDirStatSignToolPath)' sign /fd SHA256 /sha1 $(WinDirStatDevCodeSignThumbprint) '$(TargetPath)'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"</Command>
+    </PostBuildEvent>
     <Manifest>
       <AdditionalManifestFiles>res\windirstat.manifest</AdditionalManifestFiles>
       <EnableDpiAwareness>false</EnableDpiAwareness>
@@ -470,6 +562,9 @@
     <PreBuildEvent>
       <Command>POWERSHELL.EXE -NoLogo -ExecutionPolicy Unrestricted -NoProfile -File "$(ProjectDir)Build\Compress Strings.ps1" -Path "$(ProjectDir)res"</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Thumbprint -eq '$(WinDirStatDevCodeSignThumbprint)' } | Select-Object -First 1; if (-not $cert) { Write-Error 'WinDirStat dev code-signing cert not found in CurrentUser\\My.'; exit 1 }; &amp; '$(WinDirStatSignToolPath)' sign /fd SHA256 /sha1 $(WinDirStatDevCodeSignThumbprint) '$(TargetPath)'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
@@ -533,6 +628,12 @@
     <Import Project="$(ProjectDir)/Build/Project.props" Condition="exists('$(ProjectDir)/Build/Project.props') AND '$(SolutionDir)' != '$(ProjectDir)'" Label="Project-specific (local/late)" />
   </ImportGroup>
   <ItemGroup>
+    <ProjectReference Include="windirstat-scan-host.vcxproj">
+      <Project>{9575FF93-D101-4D08-B1AB-9E7FCE99732F}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="Controls\ColorButton.h" />
     <ClInclude Include="Controls\ExtensionListControl.h" />
     <ClInclude Include="Controls\FileDupeControl.h" />
@@ -554,6 +655,7 @@
     <ClInclude Include="DiscoveredDirectory.h" />
     <ClInclude Include="DiscoveredFile.h" />
     <ClInclude Include="DirectoryProgressBatch.h" />
+    <ClInclude Include="DirectoryDiscoveryEngine.h" />
     <ClInclude Include="DiscoveryBatch.h" />
     <ClInclude Include="Engine\Rpc\IRpcTransportClient.h" />
     <ClInclude Include="Engine\Rpc\NamedPipeRpcClient.h" />
@@ -566,12 +668,11 @@
     <ClInclude Include="IScanEngine.h" />
     <ClInclude Include="IScanObserver.h" />
     <ClInclude Include="LegacyDiscoveryEngine.h" />
-    <ClInclude Include="LegacyDiscoveryRequest.h" />
     <ClInclude Include="LegacyScanEngine.h" />
     <ClInclude Include="Pages\PagePrompts.h" />
+    <ClInclude Include="RemoteStub\BasicReplacementDiscoveryEngine.h" />
     <ClInclude Include="RemoteStub\RemoteScanHost.h" />
     <ClInclude Include="RemoteStub\NamedPipeRpcServer.h" />
-    <ClInclude Include="RemoteStub\RemoteStubCommandLine.h" />
     <ClInclude Include="RemoteStub\StubDirectoryDiscoveryEngine.h" />
     <ClInclude Include="ScanEngineFactory.h" />
     <ClInclude Include="ScanNode.h" />
@@ -648,10 +749,6 @@
     <ClCompile Include="LegacyDiscoveryEngine.cpp" />
     <ClCompile Include="LegacyScanEngine.cpp" />
     <ClCompile Include="Pages\PagePrompts.cpp" />
-    <ClCompile Include="RemoteStub\RemoteScanHost.cpp" />
-    <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp" />
-    <ClCompile Include="RemoteStub\RemoteStubCommandLine.cpp" />
-    <ClCompile Include="RemoteStub\StubDirectoryDiscoveryEngine.cpp" />
     <ClCompile Include="ScanEngineFactory.cpp" />
     <ClCompile Include="ScanResultToCItemMapper.cpp" />
     <ClCompile Include="Views\ControlView.cpp" />
@@ -687,6 +784,7 @@
     <ClCompile Include="Dialogs\SearchDlg.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebugVerbose|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

@@ -328,8 +328,41 @@ bool IsElevationAvailable() noexcept
 
 void RunElevated(const std::wstring& cmdLine)
 {
+    std::wstring elevatedCommandLine = cmdLine;
+    std::array<wchar_t, 16> scanEngine{};
+    const DWORD length = GetEnvironmentVariableW(L"WINDIRSTAT_SCAN_ENGINE", scanEngine.data(), static_cast<DWORD>(scanEngine.size()));
+    if (length != 0 && length < scanEngine.size())
+    {
+        std::wstring value(scanEngine.data(), length);
+        _wcslwr_s(value.data(), value.size() + 1);
+        if (value == L"rpc" && elevatedCommandLine.find(L"--scan-engine") == std::wstring::npos)
+        {
+            if (!elevatedCommandLine.empty())
+                elevatedCommandLine += L' ';
+
+            elevatedCommandLine += L"--scan-engine rpc";
+            VTRACE(L"[RPC] Preserving RPC mode across elevation. commandLine={}", elevatedCommandLine);
+        }
+    }
+
+    for (int index = 1; index < __argc; ++index)
+    {
+        const std::wstring arg = __wargv[index];
+        if (arg == L"--rpc-log-level" && index + 1 < __argc &&
+            elevatedCommandLine.find(L"--rpc-log-level") == std::wstring::npos)
+        {
+            const std::wstring value = __wargv[++index];
+            if (!elevatedCommandLine.empty())
+                elevatedCommandLine += L' ';
+
+            elevatedCommandLine += std::format(L"--rpc-log-level {}", value);
+            VTRACE(L"[RPC] Preserving RPC log level across elevation. commandLine={}", elevatedCommandLine);
+            break;
+        }
+    }
+
     PersistedSetting::WritePersistedProperties();
-    if (ShellExecuteWrapper(GetAppFileName(), cmdLine, L"runas"))
+    if (ShellExecuteWrapper(GetAppFileName(), elevatedCommandLine, L"runas"))
         ExitProcess(0);
 }
 

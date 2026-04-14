@@ -1855,9 +1855,16 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
     m_scanVisualInfo = std::move(visualInfo);
     m_scanObserver = std::make_unique<CItemScanObserver>(*this);
 
-    bool started = false;
-    for (const auto& item : m_scanItems)
+    auto isScannableRoot = [](const CItem* candidate)
     {
+        return candidate != nullptr &&
+            (candidate->IsTypeOrFlag(ITF_ROOTITEM) || CDirStatApp::Get()->IsFollowingAllowed(candidate->GetReparseTag()));
+    };
+
+    bool started = false;
+    for (std::size_t index = 0; index < m_scanItems.size(); ++index)
+    {
+        const auto& item = m_scanItems[index];
         if (!item->IsTypeOrFlag(ITF_ROOTITEM) && !CDirStatApp::Get()->IsFollowingAllowed(item->GetReparseTag()))
         {
             continue;
@@ -1873,6 +1880,8 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
 
         ScanRequest request{};
         request.rootPath = item->GetPath();
+        request.expectMoreInputs = !started &&
+            std::ranges::any_of(m_scanItems | std::views::drop(index + 1), isScannableRoot);
         if (!started)
         {
             GetScanEngine()->StartScan(request, *m_scanObserver);

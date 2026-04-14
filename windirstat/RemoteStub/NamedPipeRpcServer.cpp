@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "RemoteStub/NamedPipeRpcServer.h"
+#include "RemoteStub/ScanHostLogger.h"
 
 namespace
 {
@@ -53,8 +54,24 @@ bool NamedPipeRpcServer::Listen()
     if (m_pipe == INVALID_HANDLE_VALUE)
         return false;
 
+    ScanHostLogger::Log(std::format(L"[HOST] PipeListening pipe=\"{}\"", m_pipeName));
+    ScanHostLogger::Log(std::format(L"[HOST] WaitingForClientConnection pipe=\"{}\"", m_pipeName));
     const BOOL connected = ConnectNamedPipe(m_pipe, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED ? TRUE : FALSE);
+    if (connected == TRUE)
+        ScanHostLogger::Log(std::format(L"[HOST] ClientConnected pipe=\"{}\"", m_pipeName));
     return connected == TRUE;
+}
+
+bool NamedPipeRpcServer::HasPendingRequestMessage() const
+{
+    if (m_pipe == INVALID_HANDLE_VALUE)
+        return false;
+
+    DWORD bytesAvailable = 0;
+    if (!PeekNamedPipe(m_pipe, nullptr, 0, nullptr, &bytesAvailable, nullptr))
+        return false;
+
+    return bytesAvailable >= sizeof(DWORD);
 }
 
 std::optional<RpcRequestMessage> NamedPipeRpcServer::ReadRequestMessage()

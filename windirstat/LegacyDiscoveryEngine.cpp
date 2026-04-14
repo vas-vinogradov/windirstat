@@ -34,25 +34,26 @@ void DiscoveryLog(
 }
 }
 
-DiscoveryBatch LegacyDiscoveryEngine::Discover(const LegacyDiscoveryRequest& request) {
+DiscoveryBatch LegacyDiscoveryEngine::Discover(const DirectoryDiscoveryRequest& request) {
     DiscoveryBatch batch;
     batch.scannedPath = request.path;
 
-    const bool ntfsContextPresent = request.ntfsContext != nullptr;
-    const bool ntfsLoaded = ntfsContextPresent && request.ntfsContext->IsLoaded();
-    const bool basicModeForced = request.forceBasic;
+    // Legacy owns its Finder contexts now; keep the old diagnostic shape
+    // without pushing those contexts through the shared discovery request.
+    const bool ntfsContextPresent = true;
+    const bool ntfsLoaded = m_contextNtfs.IsLoaded();
+    const bool basicModeForced = false;
     Finder* finder = nullptr;
     if (ntfsLoaded && !basicModeForced) {
-        ASSERT(request.ntfsContext != nullptr);
-        ASSERT(request.ntfsContext->IsLoaded());
+        ASSERT(m_contextNtfs.IsLoaded());
         DiscoveryLog(request.path, L"Ntfs", ntfsContextPresent, ntfsLoaded, basicModeForced);
-        finder = new FinderNtfs(request.ntfsContext);
+        finder = new FinderNtfs(&m_contextNtfs);
     }
     else {
         DiscoveryLog(request.path, L"Basic", ntfsContextPresent, ntfsLoaded, basicModeForced);
-        finder = new FinderBasic(request.basicContext);
+        finder = new FinderBasic(&m_contextBasic);
     }
-    if (!finder->FindFile(request.path,request.index,request.attributes)) {
+    if (!finder->FindFile(request.path, 0, 0)) {
         delete finder;
         return batch;
     }

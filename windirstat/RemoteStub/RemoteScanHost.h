@@ -1,9 +1,7 @@
 #pragma once
 
+#include "DirectoryDiscoveryEngine.h"
 #include "Engine/Rpc/RpcMessages.h"
-#include "FinderBasic.h"
-#include "FinderNtfs.h"
-#include "LegacyDiscoveryEngine.h"
 
 #include <deque>
 #include <memory>
@@ -23,6 +21,9 @@ private:
         std::deque<std::wstring> pendingPaths{};
         bool inputClosed = false;
         bool cancelPending = false;
+        bool followMountPoints = false;
+        bool followSymbolicLinks = false;
+        bool followJunctions = false;
         ScanTerminalReason cancelReason = ScanTerminalReason::EngineInterrupted;
     };
 
@@ -34,15 +35,15 @@ private:
     };
 
     void ResetActiveRequest(ActiveRequestState& state);
-    void StartActiveRequest(ActiveRequestState& state, std::uint64_t requestId, const std::wstring& rootPath);
+    void StartActiveRequest(ActiveRequestState& state, const RpcStartScanRequest& request);
     void PromoteQueuedStart(ActiveRequestState& state, std::optional<RpcStartScanRequest>& queuedStart);
+    void HandleRequestMessage(ActiveRequestState& activeRequest, std::optional<RpcStartScanRequest>& queuedStart, const RpcRequestMessage& message);
     bool SendCanceled(class NamedPipeRpcServer& server, const ActiveRequestState& state);
     bool SendCompleted(class NamedPipeRpcServer& server, const ActiveRequestState& state);
-    DiscoveryResult ExecuteDiscovery(class NamedPipeRpcServer& server, std::uint64_t requestId, const std::wstring& path);
+    DiscoveryResult ExecuteDiscovery(class NamedPipeRpcServer& server, ActiveRequestState& state, const std::wstring& path);
     static std::unique_ptr<IDirectoryDiscoveryEngine> CreateDiscoveryEngine();
     static std::wstring GetDiscoveryEngineMode();
+    static bool ShouldQueueDiscoveredDirectory(const ActiveRequestState& state, const DiscoveredDirectory& directory);
 
-    FinderNtfsContext m_contextNtfs{};
-    FinderBasicContext m_contextBasic{};
     std::unique_ptr<IDirectoryDiscoveryEngine> m_discoveryEngine;
 };

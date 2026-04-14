@@ -11,6 +11,7 @@
 windirstat/res/lang_combined.txt
 windirstat/Build/
 windirstat/intermediate/
+windirstat/rust/**/target/
 *.exe
 *.pdb
 *.obj

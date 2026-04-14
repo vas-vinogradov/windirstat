@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_map>
 
 class RPCScanEngine final
     : public IScanEngine
@@ -22,6 +23,7 @@ public:
     void Suspend() override;
     void Resume() override;
     bool IsRunning() const override;
+    bool OwnsTraversal() const override { return true; }
     std::uint64_t GetActiveRequestId() const override;
 
 private:
@@ -46,12 +48,20 @@ private:
     bool IsCurrentRequest(std::uint64_t requestId) const;
     IScanObserver* GetActiveObserver() const;
     PendingStart TakePendingStart();
+    void RecordExternalInputPath(const std::wstring& path);
+    void UndoExternalInputPath(const std::wstring& path);
+    bool CompleteExternalInputPath(const std::wstring& path);
+    void ResetExternalInputTracking();
+    std::wstring DescribeExternalInputState() const;
+    std::wstring DescribeExternalInputStateLocked() const;
 
     std::unique_ptr<IRpcTransportClient> m_transportClient;
     mutable std::mutex m_stateMutex;
     mutable std::mutex m_observerMutex;
+    mutable std::mutex m_inputTrackingMutex;
     IScanObserver* m_activeObserver = nullptr;
     std::optional<PendingStart> m_pendingStart;
+    std::unordered_map<std::wstring, std::uint32_t> m_pendingInputPaths;
     std::atomic_uint64_t m_nextRequestId = 1;
     std::atomic_uint64_t m_activeRequestId = 0;
     std::atomic_uint32_t m_outstandingWorkItems = 0;

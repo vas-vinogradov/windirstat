@@ -24,7 +24,7 @@ bool PathContainsInsensitive(const std::wstring& path, const std::wstring& token
 }
 }
 
-DiscoveryBatch StubDirectoryDiscoveryEngine::Discover(const LegacyDiscoveryRequest& request)
+DiscoveryBatch StubDirectoryDiscoveryEngine::Discover(const DirectoryDiscoveryRequest& request)
 {
     DiscoveryBatch batch{};
     batch.scannedPath = request.path;

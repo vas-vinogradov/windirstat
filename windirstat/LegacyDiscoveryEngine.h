@@ -1,19 +1,15 @@
 #pragma once
 
-#include "DiscoveryBatch.h"
-#include "LegacyDiscoveryRequest.h"
-
-class IDirectoryDiscoveryEngine
-{
-public:
-    virtual ~IDirectoryDiscoveryEngine() = default;
-    // Performs discovery for exactly one processed directory and returns the
-    // immediate discovered children for that directory.
-    virtual DiscoveryBatch Discover(const LegacyDiscoveryRequest& request) = 0;
-};
+#include "DirectoryDiscoveryEngine.h"
+#include "FinderBasic.h"
+#include "FinderNtfs.h"
 
 class LegacyDiscoveryEngine final : public IDirectoryDiscoveryEngine
 {
 public:
-    DiscoveryBatch Discover(const LegacyDiscoveryRequest& request) override;
+    DiscoveryBatch Discover(const DirectoryDiscoveryRequest& request) override;
+
+private:
+    FinderNtfsContext m_contextNtfs{};
+    FinderBasicContext m_contextBasic{};
 };

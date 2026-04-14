@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{9DF4DB42-D733-4B01-B3A6-DAA08084E26E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{3F5E84E1-DCA3-4C06-A730-EF3FFDD6AA8D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\RemoteStub">
+      <UniqueIdentifier>{378332BA-41B4-44FC-AACD-42C3F5E9A65F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\RemoteStub">
+      <UniqueIdentifier>{1A428CD8-6A99-4CC8-B577-3FE5CFA0A303}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Engine\Rpc">
+      <UniqueIdentifier>{C7182D77-54B8-42E1-8AE8-08D2B9BB85B8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine\Rpc">
+      <UniqueIdentifier>{4AB23B3A-9487-47DE-B820-4D29194861E8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Engine\Scanning\Discovery">
+      <UniqueIdentifier>{F7675CC2-9D14-4045-9FF6-A61D23C49F8E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Engine\Scanning\Discovery">
+      <UniqueIdentifier>{0A5EB0E9-032A-4133-926E-0F76F627FE00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Core\Finders">
+      <UniqueIdentifier>{12B261CC-C817-484E-B8C6-2C86B6CA88F6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core\Finders">
+      <UniqueIdentifier>{084E29D6-1C4B-4C0A-99D9-D601A0C17A0E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Core">
+      <UniqueIdentifier>{B87FE6CF-138A-4C01-8B95-3D401E5E44A0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core">
+      <UniqueIdentifier>{2338A611-693E-48DF-AFEF-2E6B6C2242C4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Finder.h">
+      <Filter>Header Files\Core\Finders</Filter>
+    </ClInclude>
+    <ClInclude Include="FinderBasic.h">
+      <Filter>Header Files\Core\Finders</Filter>
+    </ClInclude>
+    <ClInclude Include="FinderNtfs.h">
+      <Filter>Header Files\Core\Finders</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveredDirectory.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveredFile.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="DiscoveryBatch.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectoryDiscoveryEngine.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="LegacyDiscoveryEngine.h">
+      <Filter>Header Files\Engine\Scanning\Discovery</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Rpc\RpcMessages.h">
+      <Filter>Header Files\Engine\Rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\BasicReplacementDiscoveryEngine.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\NamedPipeRpcServer.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\RustDiscoveryBridge.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\RustReplacementDiscoveryEngine.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanHostLogger.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\RemoteScanHost.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\StubDirectoryDiscoveryEngine.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="FinderBasic.cpp">
+      <Filter>Source Files\Core\Finders</Filter>
+    </ClCompile>
+    <ClCompile Include="FinderNtfs.cpp">
+      <Filter>Source Files\Core\Finders</Filter>
+    </ClCompile>
+    <ClCompile Include="LegacyDiscoveryEngine.cpp">
+      <Filter>Source Files\Engine\Scanning\Discovery</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Rpc\RpcMessages.cpp">
+      <Filter>Source Files\Engine\Rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\BasicReplacementDiscoveryEngine.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\RustReplacementDiscoveryEngine.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\ScanHostLogger.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\RemoteScanHost.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\ScanHostMain.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\StubDirectoryDiscoveryEngine.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

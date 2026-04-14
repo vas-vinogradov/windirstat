@@ -2,8 +2,6 @@
 
 #include "IScanEngine.h"
 #include "LegacyDiscoveryEngine.h"
-#include "FinderNtfs.h"
-#include "FinderBasic.h"
 
 #include <atomic>
 #include <memory>
@@ -32,7 +30,5 @@ private:
     std::unique_ptr<ScanJob> m_job;
     std::atomic_uint64_t m_nextRequestId = 1;
     std::atomic_uint64_t m_activeRequestId = 0;
-    FinderNtfsContext m_contextNtfs{};
-    FinderBasicContext m_contextBasic{};
     LegacyDiscoveryEngine m_discoveryEngine{};
 };
