@@ -37,6 +37,10 @@ This is not a replacement for the MFC model.
    `IScanObserver`.
 3. Later, consider a gRPC or HTTP bridge if the host boundary changes.
 
-Recommended next step: implement a thin C# named-pipe JSON client. It can consume
-the existing `RpcDirectoryProgressEvent` stream and map it into the same C# DTOs
-without changing the Rust engine, C++ host, or RPC protocol.
+Implemented prototype path: `NamedPipeScanClient` launches the existing scan host,
+speaks the length-prefixed UTF-8 JSON named-pipe protocol, maps
+`DirectoryProgressEvent` and `DirectoryProgressBatchEvent` into the C# DTOs, and
+feeds `IScanObserver`. The mock feed remains available for UI-only iteration.
+
+Next step: harden the C# client lifecycle and cancellation story before using it
+for larger interactive scans.

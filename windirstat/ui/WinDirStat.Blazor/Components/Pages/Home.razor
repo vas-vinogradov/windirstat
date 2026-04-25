@@ -1,9 +1,17 @@
 @page "/"
 @inject MockScanFeed Feed
+@inject NamedPipeScanClient RpcClient
 
 <h1>WinDirStat Scan Prototype</h1>
 
-<button @onclick="RunMockScan">Run Mock Scan</button>
+<p>
+    <input @bind="_rootPath" size="80" />
+    <button @onclick="RunRealScan" disabled="@_running">Start Real Scan</button>
+    <button @onclick="RunMockScan" disabled="@_running">Run Mock Scan</button>
+</p>
+
+<p>@_status</p>
+<p>events=@_eventCount directories=@_directoryCount entries=@_entryCount logical=@_logicalTotal</p>
 
 <h2>Directory Results</h2>
 <pre>@_lastDtoJson</pre>
@@ -20,22 +28,88 @@ else
 
 @code {
     private readonly ScanTreeProjection _projection = new();
+    private string _rootPath = @"C:\Users\vasil\Documents\Projects\windirstat\windirstat\rust\scan_engine";
     private string _lastDtoJson = "";
+    private string _status = "Idle";
+    private bool _running;
+    private int _eventCount;
+    private int _directoryCount;
+    private int _entryCount;
+    private ulong _logicalTotal;
 
     private async Task RunMockScan()
     {
+        ResetRun();
         _projection.StartRequest(1);
         await foreach (var dto in Feed.StreamSampleAsync(1))
         {
-            _projection.OnDirectoryResult(dto);
-            _lastDtoJson = System.Text.Json.JsonSerializer.Serialize(dto, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            ApplyDirectoryResult(dto);
             StateHasChanged();
             await Task.Delay(150);
         }
 
         _projection.OnScanCompleted(1);
+        _status = "Mock scan completed.";
+        _running = false;
+    }
+
+    private async Task RunRealScan()
+    {
+        ResetRun();
+        _projection.StartRequest(1);
+        var observer = new DelegatingScanObserver(
+            dto =>
+            {
+                ApplyDirectoryResult(dto);
+                StateHasChanged();
+            },
+            requestId =>
+            {
+                _projection.OnScanCompleted(requestId);
+                _status = "Scan completed.";
+                _running = false;
+                StateHasChanged();
+            },
+            (requestId, error) =>
+            {
+                _projection.OnScanFailed(requestId, error);
+                _status = $"Scan failed: {error}";
+                _running = false;
+                StateHasChanged();
+            });
+
+        try
+        {
+            await RpcClient.StartScanAsync(_rootPath, observer, 1);
+        }
+        catch (Exception ex)
+        {
+            _status = $"Scan failed: {ex.Message}";
+            _running = false;
+        }
+    }
+
+    private void ResetRun()
+    {
+        _lastDtoJson = "";
+        _status = "Scanning...";
+        _running = true;
+        _eventCount = 0;
+        _directoryCount = 0;
+        _entryCount = 0;
+        _logicalTotal = 0;
+    }
+
+    private void ApplyDirectoryResult(DirectoryResultDto dto)
+    {
+        _projection.OnDirectoryResult(dto);
+        _eventCount++;
+        _directoryCount++;
+        _entryCount += dto.Entries.Count;
+        _logicalTotal = _projection.Root?.SizeLogical ?? 0;
+        _lastDtoJson = System.Text.Json.JsonSerializer.Serialize(dto, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
     }
 }
