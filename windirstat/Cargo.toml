@@ -1,0 +1,7 @@
+# Intent: make the mixed WinDirStat checkout discoverable to Cargo tooling
+# and rust-analyzer while keeping durable Rust code under rust/.
+[workspace]
+members = [
+    "rust/scan_engine",
+]
+resolver = "2"
