@@ -1,0 +1,21 @@
+@using WinDirStat.Blazor.Projection
+
+<details open>
+    <summary>@Node.Name (@Node.SizeLogical bytes)</summary>
+    @if (Node.Children.Count > 0)
+    {
+        <ul>
+            @foreach (var child in Node.Children.Values.OrderByDescending(n => n.IsDirectory).ThenBy(n => n.Name))
+            {
+                <li>
+                    <TreeNodeView Node="child" />
+                </li>
+            }
+        </ul>
+    }
+</details>
+
+@code {
+    [Parameter, EditorRequired]
+    public ScanNode Node { get; set; } = null!;
+}

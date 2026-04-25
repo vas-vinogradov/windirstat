@@ -13,6 +13,8 @@ windirstat/Build/
 windirstat/intermediate/
 windirstat/target/
 windirstat/rust/**/target/
+windirstat/ui/**/bin/
+windirstat/ui/**/obj/
 windirstat/compile_commands.json
 .cache/
 *.exe

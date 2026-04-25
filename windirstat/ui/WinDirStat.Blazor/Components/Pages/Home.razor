@@ -1,0 +1,41 @@
+@page "/"
+@inject MockScanFeed Feed
+
+<h1>WinDirStat Scan Prototype</h1>
+
+<button @onclick="RunMockScan">Run Mock Scan</button>
+
+<h2>Directory Results</h2>
+<pre>@_lastDtoJson</pre>
+
+<h2>Tree</h2>
+@if (_projection.Root is null)
+{
+    <p>No scan results.</p>
+}
+else
+{
+    <TreeNodeView Node="_projection.Root" />
+}
+
+@code {
+    private readonly ScanTreeProjection _projection = new();
+    private string _lastDtoJson = "";
+
+    private async Task RunMockScan()
+    {
+        _projection.StartRequest(1);
+        await foreach (var dto in Feed.StreamSampleAsync(1))
+        {
+            _projection.OnDirectoryResult(dto);
+            _lastDtoJson = System.Text.Json.JsonSerializer.Serialize(dto, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+            StateHasChanged();
+            await Task.Delay(150);
+        }
+
+        _projection.OnScanCompleted(1);
+    }
+}
