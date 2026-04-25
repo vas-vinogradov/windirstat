@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{3C15A3B8-9163-4F9D-9481-FB7E7D7196C7}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\RemoteStub">
+      <UniqueIdentifier>{6E542C7C-6D7B-48B8-A489-8F91C3DF8933}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Tests">
+      <UniqueIdentifier>{8194AA47-303A-4A16-906C-E093D3D53C65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{D5F2F3F8-C5AF-4812-B4D6-68729F424A3F}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\RemoteStub">
+      <UniqueIdentifier>{1AEE0539-0CE2-4FCF-A3B9-AC700795B144}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ScanTerminalReason.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanLifecycleContract.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\RustScanSessionBridge.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanSessionState.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanTraversalContract.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Engine\Rpc\RpcMessages.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\ScanSessionState.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="Tests\ScanHostSeamTests\ScanSessionStateTests.cpp">
+      <Filter>Source Files\Tests</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

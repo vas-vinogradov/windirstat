@@ -7,9 +7,10 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
 
-# Temporary migration scaffolding: this exercises the host-owned discovery work
-# unit through RPC without automating the UI. Keep it separate from the Rust
-# discovery contract harness and remove it once legacy discovery is retired.
+# Temporary migration scaffolding: this exercises the scan-host RPC adapter
+# around both the Rust-owned engine path and the legacy fallback path without
+# automating the UI. Keep it separate from the Rust discovery contract harness
+# and remove it once legacy discovery is retired.
 
 $script:RequestTimeoutMs = 15000
 
@@ -477,6 +478,10 @@ function Start-ScanHost {
         [string]$LogFile
     )
 
+    $signature = Get-AuthenticodeSignature -LiteralPath $HostPath -ErrorAction SilentlyContinue
+    $signatureStatus = if ($null -ne $signature) { [string]$signature.Status } else { "Unknown" }
+    Write-Host ("Launching scan host engine={0} path='{1}' signature={2}" -f $Engine, $HostPath, $signatureStatus)
+
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $HostPath
     $psi.Arguments = "--pipe {0} --log-file {1} --log-level verbose" -f `
@@ -496,8 +501,13 @@ function Start-ScanHost {
 
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $psi
-    if (-not $process.Start()) {
-        throw "Failed to start scan host '$HostPath'."
+    try {
+        if (-not $process.Start()) {
+            throw "Failed to start scan host '$HostPath'."
+        }
+    }
+    catch {
+        throw ("Failed to start scan host '{0}'. Signature status={1}. If Windows App Control still blocks launch, rerun with the signed build output at the same path or use a policy-allowed environment." -f $HostPath, $signatureStatus)
     }
 
     return $process
