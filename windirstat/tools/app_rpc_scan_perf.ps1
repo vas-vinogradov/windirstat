@@ -18,6 +18,14 @@ $ErrorActionPreference = "Stop"
 # PowerShell RPC tools.
 # Contract: this script changes only process environment/configuration. It does
 # not alter scan ownership, RPC protocol, or observer/model semantics.
+# Defaults: queue capacities are zero, so the run uses the synchronous RPC
+# baseline. Pass nonzero capacities only when explicitly remeasuring the
+# experimental transport queue paths.
+#
+# Examples:
+#   tools\app_rpc_scan_perf.ps1 -RootPath C:\Users\vasil\OneDrive\Documents\Projects
+#   tools\app_rpc_scan_perf.ps1 -RootPath C:\src\fixture -MeasuredRuns 5 -OutputPath perf.json
+#   tools\app_rpc_scan_perf.ps1 -RootPath C:\src\fixture -InboundQueueCapacity 64 -OutboundQueueCapacity 64
 
 function Resolve-ExistingPath {
     param([string]$Path)

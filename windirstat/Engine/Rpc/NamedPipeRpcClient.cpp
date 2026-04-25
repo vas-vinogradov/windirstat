@@ -536,6 +536,10 @@ void NamedPipeRpcClient::StartInboundProcessorIfConfigured()
         m_inboundStats = {};
     }
 
+    // Experimental: inbound queueing is disabled by default and exists only
+    // behind WINDIRSTAT_RPC_INBOUND_QUEUE_CAPACITY. The current performance
+    // baseline is the synchronous reader path because it gives the real app the
+    // best scan/observer overlap measured so far.
     // Contract: queued inbound mode preserves wire order by using exactly one
     // processor. The reader only extracts frames; parsing and observer dispatch
     // remain on the same ordered path used by synchronous mode.
@@ -727,6 +731,9 @@ bool NamedPipeRpcClient::IsVerboseLoggingEnabled()
 
 std::size_t NamedPipeRpcClient::GetInboundQueueCapacity()
 {
+    // Experimental performance path: release builds do not enable the inbound
+    // queue implicitly. A positive WINDIRSTAT_RPC_INBOUND_QUEUE_CAPACITY is the
+    // only activation mechanism; zero keeps the synchronous baseline path.
     return ReadInboundQueueCapacityFromEnvironment();
 }
 

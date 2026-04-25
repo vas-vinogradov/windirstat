@@ -187,6 +187,9 @@ void NamedPipeRpcServer::StartWriterThreadIfConfigured()
     if (m_outboundQueueCapacity == 0 || m_writerThread.has_value())
         return;
 
+    // Experimental: outbound queueing is disabled by default and exists only
+    // behind WINDIRSTAT_RPC_OUTBOUND_QUEUE_CAPACITY. The synchronous writer is
+    // the current real-app performance baseline.
     // Intent: optional transport-only decoupling. The scan session still owns
     // scan progression; this thread only serializes and writes already-produced
     // RPC events in FIFO order.
@@ -279,6 +282,9 @@ bool NamedPipeRpcServer::EnqueueEventMessage(RpcEventMessage message, NamedPipeR
 
 std::size_t NamedPipeRpcServer::GetOutboundQueueCapacity()
 {
+    // Experimental performance path: release builds do not enable the outbound
+    // queue implicitly. A positive WINDIRSTAT_RPC_OUTBOUND_QUEUE_CAPACITY is the
+    // only activation mechanism; zero keeps synchronous SendEventMessage writes.
     return ReadQueueCapacityFromEnvironment();
 }
 

@@ -49,6 +49,21 @@ bool IsRpcVerboseLoggingEnabled()
     return false;
 }
 
+bool IsExternalInputAuditEnabled()
+{
+    if (IsRpcVerboseLoggingEnabled())
+        return true;
+
+    std::array<wchar_t, 16> value{};
+    const DWORD length = GetEnvironmentVariableW(L"WINDIRSTAT_RPC_EXTERNAL_INPUT_AUDIT", value.data(), static_cast<DWORD>(value.size()));
+    if (length == 0 || length >= value.size())
+        return false;
+
+    std::wstring text(value.data(), length);
+    _wcslwr_s(text.data(), text.size() + 1);
+    return text == L"1" || text == L"true" || text == L"yes";
+}
+
 std::wstring RpcTimestamp()
 {
     SYSTEMTIME now{};
@@ -316,11 +331,14 @@ void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& e
         return;
 
     const bool completedTrackedInput = CompleteExternalInputPath(event.directoryPath);
-    RpcClientLifecycleLog(event.requestId, L"ExternalInputCompletionAudit",
-        std::format(L"path=\"{}\" matchedTrackedInput={} state={}",
-            event.directoryPath,
-            completedTrackedInput ? 1 : 0,
-            DescribeExternalInputState()));
+    if (IsExternalInputAuditEnabled())
+    {
+        RpcClientLifecycleLog(event.requestId, L"ExternalInputCompletionAudit",
+            std::format(L"path=\"{}\" matchedTrackedInput={} state={}",
+                event.directoryPath,
+                completedTrackedInput ? 1 : 0,
+                DescribeExternalInputState()));
+    }
 
     if (completedTrackedInput)
     {

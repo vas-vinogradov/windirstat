@@ -482,6 +482,9 @@ void RemoteScanHost::StartActiveRequest(ActiveRequestState& state, const RpcStar
             options.followJunctions ? 1 : 0));
     if (state.batchProgressEnabled)
     {
+        // Experimental: progress batching is disabled by default and exists
+        // only behind WINDIRSTAT_RPC_BATCH_PROGRESS. The measured real-app
+        // baseline uses unbatched synchronous progress events.
         RpcHostLog(requestId, L"DirectoryProgressBatchingEnabled",
             std::format(L"batchSize={} maxDelayTicks={}", state.batchProgressSize, state.batchProgressMaxDelayTicks));
     }

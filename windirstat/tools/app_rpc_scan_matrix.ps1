@@ -1,8 +1,8 @@
 param(
     [string]$ExePath = (Join-Path $PSScriptRoot "..\build\WinDirStat_x64.exe"),
     [string]$RootPath = "C:\Users\vasil\OneDrive\Documents\Projects",
-    [int[]]$InboundQueueCapacities = @(0, 64, 256),
-    [int[]]$OutboundQueueCapacities = @(0, 64),
+    [int[]]$InboundQueueCapacities = @(0),
+    [int[]]$OutboundQueueCapacities = @(0),
     [int]$WarmupRuns = 1,
     [int]$MeasuredRuns = 3,
     [int]$TimeoutSeconds = 600,
@@ -16,6 +16,14 @@ $ErrorActionPreference = "Stop"
 # Intent: run a reproducible matrix against the real WinDirStat app so
 # NamedPipeRpcClient inbound queue behavior is measured through the production
 # RPC scan path.
+# Defaults: baseline-only synchronous RPC path. Add explicit queue capacities
+# when comparing experimental transport paths; do not treat queued runs as the
+# release baseline unless new measurements prove otherwise.
+#
+# Examples:
+#   tools\app_rpc_scan_matrix.ps1
+#   tools\app_rpc_scan_matrix.ps1 -MeasuredRuns 5 -OutputPath matrix.json
+#   tools\app_rpc_scan_matrix.ps1 -InboundQueueCapacities 0,64,256 -OutboundQueueCapacities 0,64
 
 function Resolve-ExistingPath {
     param([string]$Path)
