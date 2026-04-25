@@ -3,8 +3,8 @@
 
 #include "BlockingQueue.h"
 #include "Options.h"
-#include "DirectoryProgressBatch.h"
 #include "IScanObserver.h"
+#include "UiScanDtoMapper.h"
 
 class LegacyScanEngine::ScanJob
 {
@@ -121,13 +121,12 @@ void LegacyScanEngine::ProcessDirectory(
 
         DiscoveryBatch discoveryBatch = m_discoveryEngine.Discover(discoveryRequest);
 
-        DirectoryProgressBatch progressBatch{};
-        progressBatch.requestId = request.requestId;
-        progressBatch.directoryPath = request.rootPath;
-        progressBatch.files = std::move(discoveryBatch.files);
-        progressBatch.directories = std::move(discoveryBatch.directories);
-        progressBatch.finished = true;
-        observer.OnDirectoryProgress(std::move(progressBatch));
+        observer.OnDirectoryProgress(BuildDirectoryResultDto(
+            request.requestId,
+            request.rootPath,
+            std::move(discoveryBatch.files),
+            std::move(discoveryBatch.directories),
+            true));
     }
     catch (const std::exception& ex)
     {

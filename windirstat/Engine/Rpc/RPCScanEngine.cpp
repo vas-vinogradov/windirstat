@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "Engine/Rpc/RPCScanEngine.h"
 
-#include "DirectoryProgressBatch.h"
 #include "IScanObserver.h"
 #include "ScanError.h"
+#include "UiScanDtoMapper.h"
 
 namespace
 {
@@ -319,13 +319,7 @@ void RPCScanEngine::OnRemoteDirectoryProgress(const RpcDirectoryProgressEvent& e
     if (observer == nullptr)
         return;
 
-    DirectoryProgressBatch batch{};
-    batch.requestId = event.requestId;
-    batch.directoryPath = event.directoryPath;
-    batch.files = event.files;
-    batch.directories = event.directories;
-    batch.finished = event.finished;
-    observer->OnDirectoryProgress(std::move(batch));
+    observer->OnDirectoryProgress(BuildDirectoryResultDto(event));
 
     if (!event.finished)
         return;

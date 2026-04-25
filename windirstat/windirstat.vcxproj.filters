@@ -344,6 +344,9 @@
     <ClInclude Include="CItemScanObserver.h">
       <Filter>Header Files\Adapters</Filter>
     </ClInclude>
+    <ClInclude Include="CItemScanResultAdapter.h">
+      <Filter>Header Files\Adapters</Filter>
+    </ClInclude>
     <ClInclude Include="IScanEngine.h">
       <Filter>Header Files\Contracts</Filter>
     </ClInclude>
@@ -352,9 +355,6 @@
     </ClInclude>
     <ClInclude Include="LegacyScanEngine.h">
       <Filter>Header Files\Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="ScanResultToCItemMapper.h">
-      <Filter>Header Files\Adapters</Filter>
     </ClInclude>
     <ClInclude Include="ScanResult.h">
       <Filter>Header Files\Contracts</Filter>
@@ -386,7 +386,13 @@
     <ClInclude Include="DirectoryDiscoveryEngine.h">
       <Filter>Header Files\Engine\Scanning\Discovery</Filter>
     </ClInclude>
-    <ClInclude Include="DirectoryProgressBatch.h">
+    <ClInclude Include="UiScanDtos.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="UiScanDtoMapper.h">
+      <Filter>Header Files\Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="UiScanProjectionPlan.h">
       <Filter>Header Files\Contracts</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Rpc\IRpcTransportClient.h">
@@ -416,6 +422,12 @@
       <Filter>Source Files\User Interface\Dialogs</Filter>
     </ClCompile>
     <ClCompile Include="CItemScanObserver.cpp">
+      <Filter>Source Files\Adapters</Filter>
+    </ClCompile>
+    <ClCompile Include="CItemScanResultAdapter.cpp">
+      <Filter>Source Files\Adapters</Filter>
+    </ClCompile>
+    <ClCompile Include="UiScanProjectionPlan.cpp">
       <Filter>Source Files\Adapters</Filter>
     </ClCompile>
     <ClCompile Include="Dialogs\SelectDrivesDlg.cpp">
@@ -576,9 +588,6 @@
     </ClCompile>
     <ClCompile Include="LegacyScanEngine.cpp">
       <Filter>Source Files\Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="ScanResultToCItemMapper.cpp">
-      <Filter>Source Files\Adapters</Filter>
     </ClCompile>
     <ClCompile Include="ScanEngineFactory.cpp">
       <Filter>Source Files\Composition</Filter>

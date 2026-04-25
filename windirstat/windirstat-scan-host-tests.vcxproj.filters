@@ -38,6 +38,12 @@
     <ClInclude Include="RemoteStub\ScanTraversalContract.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
+    <ClInclude Include="UiScanDtos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UiScanProjectionPlan.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine\Rpc\RpcMessages.cpp">
@@ -51,6 +57,9 @@
     </ClCompile>
     <ClCompile Include="Tests\ScanHostSeamTests\ScanSessionStateTests.cpp">
       <Filter>Source Files\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="UiScanProjectionPlan.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

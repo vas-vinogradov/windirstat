@@ -22,7 +22,6 @@
 #include "IScanEngine.h"
 #include "ScanTerminalReason.h"
 #include "TreeListControl.h"
-#include <ScanResultToCItemMapper.h>
 
 class CItem;
 class CItemDupe;
@@ -104,7 +103,6 @@ private:
 
     std::unique_ptr<IScanEngine> m_scanEngine;
     std::unique_ptr<CItemScanObserver> m_scanObserver;
-    std::unique_ptr<ScanResultToCItemMapper> m_mapper;
     // Helper to initialize the scan engine
     void InitializeScanEngine();
     void FinalizeScan(std::uint64_t requestId, bool canceled, ScanTerminalReason reason = ScanTerminalReason::EngineInterrupted);

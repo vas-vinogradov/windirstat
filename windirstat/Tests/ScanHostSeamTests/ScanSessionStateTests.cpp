@@ -2,6 +2,7 @@
 
 #include "Engine/Rpc/RpcMessages.h"
 #include "RemoteStub/ScanSessionState.h"
+#include "UiScanProjectionPlan.h"
 
 #include <cstdlib>
 #include <exception>
@@ -238,6 +239,138 @@ void RpcDirectoryProgressEventStillRoundTrips()
     Check(parsed->files.size() == 1, "individual payload survives");
 }
 
+UiScanEntryDto MakeUiEntry(const UiScanEntryType type, const std::wstring& name, const std::wstring& parent = L"C:\\root")
+{
+    UiScanEntryDto entry{};
+    entry.type = type;
+    entry.name = name;
+    entry.fullPath = parent + L"\\" + name;
+    entry.sizeLogical = type == UiScanEntryType::File ? 10 : 0;
+    entry.sizePhysical = type == UiScanEntryType::File ? 4096 : 0;
+    entry.fileIndex = 0;
+    return entry;
+}
+
+DirectoryResultDto MakeDirectoryResult(std::vector<UiScanEntryDto> entries, const bool finished = true)
+{
+    DirectoryResultDto result{};
+    result.requestId = 77;
+    result.path = L"C:\\root";
+    result.entries = std::move(entries);
+    result.finished = finished;
+    return result;
+}
+
+bool ContainsKey(const std::vector<std::wstring>& keys, const std::wstring& key)
+{
+    return std::ranges::find(keys, key) != keys.end();
+}
+
+void UiProjectionPlansBasicDirectorySnapshot()
+{
+    const DirectoryResultDto result = MakeDirectoryResult({
+        MakeUiEntry(UiScanEntryType::Directory, L"child"),
+        MakeUiEntry(UiScanEntryType::File, L"alpha.txt"),
+    });
+
+    const UiScanProjectionPlan plan = BuildUiScanProjectionPlan(result, {});
+    Check(plan.childKeysToRemove.empty(), "empty parent removes nothing");
+    Check(plan.directoriesToProject.size() == 1, "one directory is projected");
+    Check(plan.filesToProject.size() == 1, "one file is projected");
+    Check(plan.directoriesToProject[0]->name == L"child", "directory name survives");
+    Check(plan.filesToProject[0]->sizePhysical == 4096, "file size survives");
+}
+
+void UiProjectionFinishedReconcilesMissingChildren()
+{
+    const DirectoryResultDto result = MakeDirectoryResult({
+        MakeUiEntry(UiScanEntryType::Directory, L"A"),
+        MakeUiEntry(UiScanEntryType::File, L"B.txt"),
+    }, true);
+    const std::vector<std::wstring> existing = {
+        BuildUiScanChildKey(UiScanEntryType::Directory, L"A"),
+        BuildUiScanChildKey(UiScanEntryType::File, L"B.txt"),
+        BuildUiScanChildKey(UiScanEntryType::File, L"C.txt"),
+    };
+
+    const UiScanProjectionPlan plan = BuildUiScanProjectionPlan(result, existing);
+    Check(ContainsKey(plan.childKeysToRemove, BuildUiScanChildKey(UiScanEntryType::Directory, L"A")), "existing A is replaced");
+    Check(ContainsKey(plan.childKeysToRemove, BuildUiScanChildKey(UiScanEntryType::File, L"B.txt")), "existing B is replaced");
+    Check(ContainsKey(plan.childKeysToRemove, BuildUiScanChildKey(UiScanEntryType::File, L"C.txt")), "finished removes missing C");
+}
+
+void UiProjectionUnfinishedKeepsMissingChildren()
+{
+    const DirectoryResultDto result = MakeDirectoryResult({
+        MakeUiEntry(UiScanEntryType::Directory, L"A"),
+        MakeUiEntry(UiScanEntryType::File, L"B.txt"),
+    }, false);
+    const std::vector<std::wstring> existing = {
+        BuildUiScanChildKey(UiScanEntryType::Directory, L"A"),
+        BuildUiScanChildKey(UiScanEntryType::File, L"B.txt"),
+        BuildUiScanChildKey(UiScanEntryType::File, L"C.txt"),
+    };
+
+    const UiScanProjectionPlan plan = BuildUiScanProjectionPlan(result, existing);
+    Check(ContainsKey(plan.childKeysToRemove, BuildUiScanChildKey(UiScanEntryType::Directory, L"A")), "existing A is replaced before incremental update");
+    Check(ContainsKey(plan.childKeysToRemove, BuildUiScanChildKey(UiScanEntryType::File, L"B.txt")), "existing B is replaced before incremental update");
+    Check(!ContainsKey(plan.childKeysToRemove, BuildUiScanChildKey(UiScanEntryType::File, L"C.txt")), "unfinished keeps missing C");
+}
+
+void UiProjectionProcessesDirectoriesBeforeFiles()
+{
+    const DirectoryResultDto result = MakeDirectoryResult({
+        MakeUiEntry(UiScanEntryType::File, L"alpha.txt"),
+        MakeUiEntry(UiScanEntryType::Directory, L"child"),
+    });
+
+    const UiScanProjectionPlan plan = BuildUiScanProjectionPlan(result, {});
+    Check(plan.directoriesToProject.size() == 1, "directory bucket is populated");
+    Check(plan.filesToProject.size() == 1, "file bucket is populated");
+    Check(plan.directoriesToProject[0]->name == L"child", "directory is projected through directory pass");
+    Check(plan.filesToProject[0]->name == L"alpha.txt", "file is projected through file pass");
+}
+
+void UiProjectionRepeatedSnapshotReplacesWithoutExtraRemovals()
+{
+    const DirectoryResultDto result = MakeDirectoryResult({
+        MakeUiEntry(UiScanEntryType::Directory, L"A"),
+        MakeUiEntry(UiScanEntryType::File, L"B.txt"),
+    });
+    const std::vector<std::wstring> existingAfterFirstApply = {
+        BuildUiScanChildKey(UiScanEntryType::Directory, L"A"),
+        BuildUiScanChildKey(UiScanEntryType::File, L"B.txt"),
+    };
+
+    const UiScanProjectionPlan plan = BuildUiScanProjectionPlan(result, existingAfterFirstApply);
+    Check(plan.childKeysToRemove.size() == 2, "second apply replaces exactly existing projected children");
+    Check(plan.directoriesToProject.size() == 1, "second apply projects one directory");
+    Check(plan.filesToProject.size() == 1, "second apply projects one file");
+}
+
+void UiProjectionRequestScopeHelperRejectsStaleResults()
+{
+    const DirectoryResultDto result = MakeDirectoryResult({ MakeUiEntry(UiScanEntryType::File, L"A.txt") });
+    Check(IsDirectoryResultForActiveRequest(result, 77), "matching request is active");
+    Check(!IsDirectoryResultForActiveRequest(result, 78), "stale request is rejected");
+}
+
+void UiProjectionNestedDirectoryRequiresParentKey()
+{
+    DirectoryResultDto parent = MakeDirectoryResult({ MakeUiEntry(UiScanEntryType::Directory, L"child") });
+    const UiScanProjectionPlan parentPlan = BuildUiScanProjectionPlan(parent, {});
+    Check(parentPlan.directoriesToProject.size() == 1, "parent DTO creates child directory first");
+
+    DirectoryResultDto child{};
+    child.requestId = 77;
+    child.path = L"C:\\root\\child";
+    child.entries = { MakeUiEntry(UiScanEntryType::File, L"leaf.txt", child.path) };
+    child.finished = true;
+    Check(child.entries[0].fullPath.starts_with(child.path), "nested child full path belongs to child DTO path");
+    const UiScanProjectionPlan childPlan = BuildUiScanProjectionPlan(child, {});
+    Check(childPlan.filesToProject.size() == 1, "child DTO is projectable after parent exists");
+}
+
 struct TestCase
 {
     std::string_view name;
@@ -254,6 +387,13 @@ constexpr TestCase Tests[] = {
     { "reset", ResetRestoresCleanSession },
     { "rpc batch progress roundtrip", RpcDirectoryProgressBatchRoundTrips },
     { "rpc individual progress roundtrip", RpcDirectoryProgressEventStillRoundTrips },
+    { "ui projection basic snapshot", UiProjectionPlansBasicDirectorySnapshot },
+    { "ui projection finished reconciliation", UiProjectionFinishedReconcilesMissingChildren },
+    { "ui projection unfinished reconciliation", UiProjectionUnfinishedKeepsMissingChildren },
+    { "ui projection ordering", UiProjectionProcessesDirectoriesBeforeFiles },
+    { "ui projection repeated updates", UiProjectionRepeatedSnapshotReplacesWithoutExtraRemovals },
+    { "ui projection request scoping", UiProjectionRequestScopeHelperRejectsStaleResults },
+    { "ui projection nested parent first", UiProjectionNestedDirectoryRequiresParentKey },
 };
 }
 

@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "DiscoveredDirectory.h"
 #include "DiscoveredFile.h"
+#include "UiScanDtos.h"
 #include "Item.h"
 #include "FinderBasic.h"
 #include "FinderNtfs.h"
@@ -359,6 +360,33 @@ CItem* CItem::AddDirectoryFromDiscovery(const DiscoveredDirectory& dir, const bo
     return child;
 }
 
+CItem* CItem::AddDirectoryFromUiScanEntry(const UiScanEntryDto& entry, const bool follow) {
+    auto* child = new CItem(IT_DIRECTORY, entry.name);
+    child->SetIndex(entry.fileIndex);
+    ULARGE_INTEGER lastChange{};
+    lastChange.QuadPart = entry.lastChangeFileTime;
+    FILETIME lastChangeFileTime{};
+    lastChangeFileTime.dwLowDateTime = lastChange.LowPart;
+    lastChangeFileTime.dwHighDateTime = lastChange.HighPart;
+    child->SetLastChange(lastChangeFileTime);
+    child->SetAttributes(entry.attributes);
+    child->SetReparseTag(entry.reparseTag);
+    if (entry.isReserved || IsTypeOrFlag(ITF_RESERVED)) {
+        child->SetFlag(ITF_RESERVED);
+    }
+    if (entry.isOffVolume && follow) {
+        child->SetFlag(ITF_BASIC);
+    }
+    if (follow)
+    {
+        child->SetParent(this);
+        child->UpwardAddReadJobs(1);
+    }
+
+    AddChild(child);
+    return child;
+}
+
 CItem* CItem::AddFileFromDiscovery(const DiscoveredFile& file) {
     auto* child = new CItem(IT_FILE, file.name);
     child->SetIndex(file.index);
@@ -368,6 +396,28 @@ CItem* CItem::AddFileFromDiscovery(const DiscoveredFile& file) {
     child->SetAttributes(file.attributes);
     child->SetReparseTag(file.reparseTag);
     if (file.isReserved || IsTypeOrFlag(ITF_RESERVED)) {
+        child->SetFlag(ITF_RESERVED);
+    }
+    child->ExtensionDataAdd();
+    AddChild(child);
+    child->SetDone();
+    return child;
+}
+
+CItem* CItem::AddFileFromUiScanEntry(const UiScanEntryDto& entry) {
+    auto* child = new CItem(IT_FILE, entry.name);
+    child->SetIndex(entry.fileIndex);
+    child->SetSizePhysical(entry.sizePhysical);
+    child->SetSizeLogical(entry.sizeLogical);
+    ULARGE_INTEGER lastChange{};
+    lastChange.QuadPart = entry.lastChangeFileTime;
+    FILETIME lastChangeFileTime{};
+    lastChangeFileTime.dwLowDateTime = lastChange.LowPart;
+    lastChangeFileTime.dwHighDateTime = lastChange.HighPart;
+    child->SetLastChange(lastChangeFileTime);
+    child->SetAttributes(entry.attributes);
+    child->SetReparseTag(entry.reparseTag);
+    if (entry.isReserved || IsTypeOrFlag(ITF_RESERVED)) {
         child->SetFlag(ITF_RESERVED);
     }
     child->ExtensionDataAdd();

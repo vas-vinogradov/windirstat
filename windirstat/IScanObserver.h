@@ -1,8 +1,8 @@
 #pragma once
 
-#include "DirectoryProgressBatch.h"
 #include "ScanError.h"
 #include "ScanTerminalReason.h"
+#include "UiScanDtos.h"
 
 class IScanObserver
 {
@@ -12,7 +12,7 @@ public:
     // Callbacks are request-scoped and may arrive on arbitrary threads.
     // UI must ignore stale callbacks for inactive requestIds.
     // UI may enqueue follow-up work in response to progress callbacks.
-    virtual void OnDirectoryProgress(DirectoryProgressBatch batch) = 0;
+    virtual void OnDirectoryProgress(DirectoryResultDto result) = 0;
     // Successful terminal event. Exactly one terminal callback must be emitted
     // per requestId, and it is the last callback for that requestId.
     virtual void OnCompleted(std::uint64_t requestId) = 0;

@@ -24,6 +24,7 @@
 
 struct DiscoveredDirectory;
 struct DiscoveredFile;
+struct UiScanEntryDto;
 class Finder;
 class FinderNtfsContext;
 class FinderBasicContext;
@@ -251,6 +252,9 @@ public:
     CItem* AddDirectoryFromDiscovery(const DiscoveredDirectory& dir, bool follow);
     // Adds a file using the DiscoveredFile DTO
     CItem* AddFileFromDiscovery(const DiscoveredFile& file);
+    // Adds scan UI DTO entries without exposing engine discovery DTOs to UI adapters.
+    CItem* AddDirectoryFromUiScanEntry(const UiScanEntryDto& entry, bool follow);
+    CItem* AddFileFromUiScanEntry(const UiScanEntryDto& entry);
     // Existing Finder-based overloads (unchanged)
     CItem* AddDirectory(const Finder& finder);
     CItem* AddFile(const Finder& finder);

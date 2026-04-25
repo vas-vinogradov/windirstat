@@ -129,6 +129,8 @@
     <ClInclude Include="RemoteStub\ScanSessionState.h" />
     <ClInclude Include="RemoteStub\ScanTraversalContract.h" />
     <ClInclude Include="ScanTerminalReason.h" />
+    <ClInclude Include="UiScanDtos.h" />
+    <ClInclude Include="UiScanProjectionPlan.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine\Rpc\RpcMessages.cpp" />
@@ -138,6 +140,7 @@
     </ClCompile>
     <ClCompile Include="RemoteStub\ScanSessionState.cpp" />
     <ClCompile Include="Tests\ScanHostSeamTests\ScanSessionStateTests.cpp" />
+    <ClCompile Include="UiScanProjectionPlan.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="PropertySheets">

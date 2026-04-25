@@ -644,6 +644,7 @@ $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <ClInclude Include="Controls\WdsListControl.h" />
     <ClInclude Include="Controls\PacMan.h" />
     <ClInclude Include="Controls\DrawTextCache.h" />
+    <ClInclude Include="CItemScanResultAdapter.h" />
     <ClInclude Include="CItemScanObserver.h" />
     <ClInclude Include="Controls\TreeListControl.h" />
     <ClInclude Include="Controls\TreeMap.h" />
@@ -654,7 +655,6 @@ $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <ClInclude Include="Dialogs\ProgressDlg.h" />
     <ClInclude Include="DiscoveredDirectory.h" />
     <ClInclude Include="DiscoveredFile.h" />
-    <ClInclude Include="DirectoryProgressBatch.h" />
     <ClInclude Include="DirectoryDiscoveryEngine.h" />
     <ClInclude Include="DiscoveryBatch.h" />
     <ClInclude Include="Engine\Rpc\IRpcTransportClient.h" />
@@ -679,8 +679,10 @@ $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <ClInclude Include="ScanRequest.h" />
     <ClInclude Include="ScanError.h" />
     <ClInclude Include="ScanResult.h" />
-    <ClInclude Include="ScanResultToCItemMapper.h" />
     <ClInclude Include="ScanTask.h" />
+    <ClInclude Include="UiScanDtoMapper.h" />
+    <ClInclude Include="UiScanDtos.h" />
+    <ClInclude Include="UiScanProjectionPlan.h" />
     <ClInclude Include="Views\ControlView.h" />
     <ClInclude Include="Finder.h" />
     <ClInclude Include="FinderNtfs.h" />
@@ -733,6 +735,7 @@ $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <ClCompile Include="Controls\TreeListControl.cpp" />
     <ClCompile Include="Controls\TreeMap.cpp" />
     <ClCompile Include="Controls\XYSlider.cpp" />
+    <ClCompile Include="CItemScanResultAdapter.cpp" />
     <ClCompile Include="CItemScanObserver.cpp" />
     <ClCompile Include="CsvLoader.cpp" />
     <ClCompile Include="DarkMode.cpp" />
@@ -750,7 +753,6 @@ $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <ClCompile Include="LegacyScanEngine.cpp" />
     <ClCompile Include="Pages\PagePrompts.cpp" />
     <ClCompile Include="ScanEngineFactory.cpp" />
-    <ClCompile Include="ScanResultToCItemMapper.cpp" />
     <ClCompile Include="Views\ControlView.cpp" />
     <ClCompile Include="Controls\FileSearchControl.cpp" />
     <ClCompile Include="FinderBasic.cpp" />
@@ -795,6 +797,8 @@ $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <ClCompile Include="Views\FileTabbedView.cpp" />
     <ClCompile Include="Views\FileTreeView.cpp" />
     <ClCompile Include="Views\TreeMapView.cpp" />
+    <ClCompile Include="UiScanDtoMapper.cpp" />
+    <ClCompile Include="UiScanProjectionPlan.cpp" />
     <ClCompile Include="WinDirStat.cpp">
     </ClCompile>
     <ClCompile Include="Controls\ColorButton.cpp">
