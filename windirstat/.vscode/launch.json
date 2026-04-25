@@ -1,0 +1,81 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "F5: WinDirStat Debug x64",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\WinDirStat_x64.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "console": "internalConsole",
+      "preLaunchTask": "Build Debug x64"
+    },
+    {
+      "name": "Debug scan host x64",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\windirstat-scan-host_x64.exe",
+      "args": [
+        "--pipe",
+        "\\\\.\\pipe\\WinDirStat.VSCode.Debug",
+        "--log-level",
+        "verbose",
+        "--log-file",
+        "${workspaceFolder}\\build\\scan-host-vscode.log"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "console": "internalConsole",
+      "preLaunchTask": "Build Scan Host Debug x64"
+    },
+    {
+      "name": "Debug Rust scan engine discovery tests",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--manifest-path",
+          "${workspaceFolder}\\rust\\scan_engine\\Cargo.toml"
+        ],
+        "filter": {
+          "name": "discovery_contract",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}\\rust\\scan_engine",
+      "sourceLanguages": [
+        "rust"
+      ]
+    },
+    {
+      "name": "Debug Rust scan engine unit tests",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": [
+          "test",
+          "--lib",
+          "--no-run",
+          "--manifest-path",
+          "${workspaceFolder}\\rust\\scan_engine\\Cargo.toml"
+        ],
+        "filter": {
+          "name": "windirstat_scan_engine",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}\\rust\\scan_engine",
+      "sourceLanguages": [
+        "rust"
+      ]
+    }
+  ]
+}

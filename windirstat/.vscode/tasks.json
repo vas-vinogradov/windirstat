@@ -1,0 +1,209 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "clangd: refresh compile_commands",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Generate-CompileCommands.ps1",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Debug x64",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Invoke-MSBuild.ps1",
+        "-Project",
+        "windirstat.vcxproj",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64",
+        "-Target",
+        "Build"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Build Scan Host Debug x64",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Invoke-MSBuild.ps1",
+        "-Project",
+        "windirstat-scan-host.vcxproj",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64",
+        "-Target",
+        "Build"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build scan host debug x64 (compile only)",
+      "detail": "Skips post-build signing; run 'sign debug x64 outputs' before launching under Application Control.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Invoke-MSBuild.ps1",
+        "-Project",
+        "windirstat-scan-host.vcxproj",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64",
+        "-Target",
+        "Build",
+        "-SkipPostBuildEvent"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build main app debug x64 (compile only)",
+      "detail": "Skips post-build signing; run 'sign debug x64 outputs' before launching under Application Control.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Invoke-MSBuild.ps1",
+        "-Project",
+        "windirstat.vcxproj",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64",
+        "-Target",
+        "Build",
+        "-SkipPostBuildEvent"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "rebuild main app debug x64",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Invoke-MSBuild.ps1",
+        "-Project",
+        "windirstat.vcxproj",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64",
+        "-Target",
+        "Rebuild"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "clean main app debug x64",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Invoke-MSBuild.ps1",
+        "-Project",
+        "windirstat.vcxproj",
+        "-Configuration",
+        "Debug",
+        "-Platform",
+        "x64",
+        "-Target",
+        "Clean"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "sign debug x64 outputs",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\vscode\\Sign-DebugOutputs.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Rust: test scan engine",
+      "type": "cargo",
+      "command": "test",
+      "args": [
+        "--manifest-path",
+        "${workspaceFolder}\\rust\\scan_engine\\Cargo.toml"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\rust\\scan_engine"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "group": "test"
+    },
+    {
+      "label": "Rust: build scan engine tests",
+      "type": "cargo",
+      "command": "test",
+      "args": [
+        "--no-run",
+        "--manifest-path",
+        "${workspaceFolder}\\rust\\scan_engine\\Cargo.toml"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\rust\\scan_engine"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ]
+    }
+  ]
+}
