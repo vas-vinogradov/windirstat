@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "RemoteStub/RustReplacementDiscoveryEngine.h"
 
-#include "RemoteStub/RustDiscoveryBridge.h"
+#include "RemoteStub/RustScanEngineBridge.h"
 #include "RemoteStub/ScanHostLogger.h"
 
 #include <stdexcept>

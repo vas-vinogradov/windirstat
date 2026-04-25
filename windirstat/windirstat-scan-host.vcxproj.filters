@@ -72,13 +72,31 @@
     <ClInclude Include="RemoteStub\BasicReplacementDiscoveryEngine.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
+    <ClInclude Include="RemoteStub\DirectoryWorkItemHostPolicy.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\DirectoryWorkItemProcessor.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
     <ClInclude Include="RemoteStub\NamedPipeRpcServer.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
-    <ClInclude Include="RemoteStub\RustDiscoveryBridge.h">
+    <ClInclude Include="RemoteStub\RustScanEngineBridge.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="RemoteStub\RustReplacementDiscoveryEngine.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\RustScanSessionBridge.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanLifecycleContract.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanSessionState.h">
+      <Filter>Header Files\RemoteStub</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteStub\ScanTraversalContract.h">
       <Filter>Header Files\RemoteStub</Filter>
     </ClInclude>
     <ClInclude Include="RemoteStub\ScanHostLogger.h">
@@ -110,10 +128,19 @@
     <ClCompile Include="RemoteStub\BasicReplacementDiscoveryEngine.cpp">
       <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
+    <ClCompile Include="RemoteStub\DirectoryWorkItemHostPolicy.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\DirectoryWorkItemProcessor.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
     <ClCompile Include="RemoteStub\NamedPipeRpcServer.cpp">
       <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
     <ClCompile Include="RemoteStub\RustReplacementDiscoveryEngine.cpp">
+      <Filter>Source Files\RemoteStub</Filter>
+    </ClCompile>
+    <ClCompile Include="RemoteStub\ScanSessionState.cpp">
       <Filter>Source Files\RemoteStub</Filter>
     </ClCompile>
     <ClCompile Include="RemoteStub\ScanHostLogger.cpp">
