@@ -27,6 +27,21 @@ CIconHandler* GetIconHandler()
     return CDirStatApp::Get()->GetIconHandler();
 }
 
+namespace
+{
+bool IsElevationDisabledForAutomation()
+{
+    std::array<wchar_t, 16> value{};
+    const DWORD length = GetEnvironmentVariableW(L"WINDIRSTAT_DISABLE_ELEVATION", value.data(), static_cast<DWORD>(value.size()));
+    if (length == 0 || length >= value.size())
+        return false;
+
+    std::wstring text(value.data(), length);
+    _wcslwr_s(text.data(), text.size() + 1);
+    return text == L"1" || text == L"true" || text == L"yes";
+}
+}
+
 // CDirStatApp
 
 BEGIN_MESSAGE_MAP(CDirStatApp, CWinAppEx)
@@ -285,10 +300,13 @@ public:
         {
             for (const auto& paramSpilt : SplitString(param))
             {
-                if (!m_strFileName.IsEmpty()) m_strFileName += wds::chrPipe;
                 std::error_code ec;
                 const std::wstring fullPath = std::filesystem::absolute(paramSpilt + L"\\", ec).wstring();
-                if (FolderExists(fullPath)) m_strFileName += fullPath.c_str();
+                if (FolderExists(fullPath))
+                {
+                    if (!m_strFileName.IsEmpty()) m_strFileName += wds::chrPipe;
+                    m_strFileName += fullPath.c_str();
+                }
             }
             return;
         }
@@ -325,7 +343,7 @@ BOOL CDirStatApp::InitInstance()
     LoadStdProfileSettings(0);
 
     // Silently restart elevated conditionally before any expensive initialization
-    if (IsElevationAvailable() && COptions::AutoElevate && !COptions::ShowElevationPrompt) // only if user doesn't want to be prompted
+    if (!IsElevationDisabledForAutomation() && IsElevationAvailable() && COptions::AutoElevate && !COptions::ShowElevationPrompt) // only if user doesn't want to be prompted
     {
         RunElevated(m_lpCmdLine);
     }
@@ -390,7 +408,7 @@ BOOL CDirStatApp::InitInstance()
     }
 
     // Allow user to elevate if desired
-    if (IsElevationAvailable() && COptions::ShowElevationPrompt && !hideApp)
+    if (!IsElevationDisabledForAutomation() && IsElevationAvailable() && COptions::ShowElevationPrompt && !hideApp)
     {
         if ([&]() -> bool
             {

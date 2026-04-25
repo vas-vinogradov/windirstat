@@ -48,6 +48,15 @@ struct RpcDirectoryProgressEvent
     bool finished = false;
 };
 
+struct RpcDirectoryProgressBatchEvent
+{
+    std::uint64_t requestId = 0;
+    // Contract: this is a transport optimization only. Each item has the same
+    // logical meaning as an individual DirectoryProgressEvent and must be
+    // replayed through the existing observer path in order.
+    std::vector<RpcDirectoryProgressEvent> items;
+};
+
 struct RpcScanCompletedEvent
 {
     std::uint64_t requestId = 0;
@@ -71,7 +80,7 @@ struct RpcScanFailedEvent
 };
 
 using RpcRequestMessage = std::variant<RpcStartScanRequest, RpcEnqueueRequest, RpcCloseRequestInput, RpcCancelScanRequest>;
-using RpcEventMessage = std::variant<RpcDirectoryProgressEvent, RpcScanCompletedEvent, RpcScanCanceledEvent, RpcScanFailedEvent>;
+using RpcEventMessage = std::variant<RpcDirectoryProgressEvent, RpcDirectoryProgressBatchEvent, RpcScanCompletedEvent, RpcScanCanceledEvent, RpcScanFailedEvent>;
 
 std::string SerializeRpcRequestMessage(const RpcRequestMessage& message);
 std::string SerializeRpcEventMessage(const RpcEventMessage& message);

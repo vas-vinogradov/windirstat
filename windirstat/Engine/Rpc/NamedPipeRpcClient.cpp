@@ -23,6 +23,50 @@ bool IsRpcVerboseLoggingEnabledFromCommandLine()
     return false;
 }
 
+std::uint64_t ReadPerformanceCounter()
+{
+    LARGE_INTEGER value{};
+    QueryPerformanceCounter(&value);
+    return static_cast<std::uint64_t>(value.QuadPart);
+}
+
+double PerformanceTicksToMilliseconds(const std::uint64_t ticks)
+{
+    static const double frequency = []()
+    {
+        LARGE_INTEGER value{};
+        QueryPerformanceFrequency(&value);
+        return static_cast<double>(value.QuadPart);
+    }();
+
+    return (static_cast<double>(ticks) * 1000.0) / frequency;
+}
+
+std::size_t ReadInboundQueueCapacityFromEnvironment()
+{
+    constexpr std::wstring_view variableName = L"WINDIRSTAT_RPC_INBOUND_QUEUE_CAPACITY";
+    std::array<wchar_t, 32> value{};
+    const DWORD length = GetEnvironmentVariableW(variableName.data(), value.data(), static_cast<DWORD>(value.size()));
+    if (length == 0 || length >= value.size())
+        return 0;
+
+    try
+    {
+        return std::clamp<std::size_t>(std::stoull(std::wstring(value.data(), length)), 0, 4096);
+    }
+    catch (...)
+    {
+        return 0;
+    }
+}
+
+bool IsTerminalEvent(const RpcEventMessage& event)
+{
+    return std::holds_alternative<RpcScanCompletedEvent>(event) ||
+        std::holds_alternative<RpcScanCanceledEvent>(event) ||
+        std::holds_alternative<RpcScanFailedEvent>(event);
+}
+
 bool WriteAll(HANDLE handle, const void* buffer, const DWORD bytesToWrite)
 {
     DWORD totalWritten = 0;
@@ -82,9 +126,14 @@ void TraceOutgoingRequest(const RpcCancelScanRequest& request)
 
 NamedPipeRpcClient::NamedPipeRpcClient()
     : m_pipeName(CreatePipeName())
+    , m_clientMetricsLogFilePath(GetClientMetricsLogFilePath())
+    , m_inboundQueueCapacity(GetInboundQueueCapacity())
     , m_verboseLogging(IsVerboseLoggingEnabled())
 {
     VTRACE(L"[RPC] NamedPipeRpcClient created. pipe={}", m_pipeName);
+    AppendClientMetricsLog(std::format(L"[RPC] NamedPipeRpcClient created pipe={} inboundQueueCapacity={}",
+        m_pipeName,
+        m_inboundQueueCapacity));
 }
 
 NamedPipeRpcClient::~NamedPipeRpcClient()
@@ -96,6 +145,7 @@ NamedPipeRpcClient::~NamedPipeRpcClient()
     if (m_readerThread.has_value() && m_readerThread->joinable())
         m_readerThread->join();
     m_readerThread.reset();
+    StopInboundProcessor();
 
     StopRemoteHost();
 }
@@ -142,10 +192,14 @@ bool NamedPipeRpcClient::EnsureConnected()
 
     m_transportFailureNotified.store(false, std::memory_order_release);
     VTRACE(L"[RPC] EnsureConnected starting host connection. pipe={}", m_pipeName);
+    AppendClientMetricsLog(std::format(L"[RPC] EnsureConnected starting pipe={}", m_pipeName));
 
     if (!EnsureHostRunning())
     {
         VTRACE(L"[RPC] EnsureHostRunning failed. error={} message={}", GetLastError(), TranslateError());
+        AppendClientMetricsLog(std::format(L"[RPC] EnsureHostRunning failed error={} message={}",
+            GetLastError(),
+            TranslateError()));
         NotifyTransportFailure(GetLastError(), L"Failed to start remote RPC host.");
         return false;
     }
@@ -153,6 +207,9 @@ bool NamedPipeRpcClient::EnsureConnected()
     if (!WaitUntilHostReady())
     {
         VTRACE(L"[RPC] WaitUntilHostReady failed. error={} message={}", GetLastError(), TranslateError());
+        AppendClientMetricsLog(std::format(L"[RPC] WaitUntilHostReady failed error={} message={}",
+            GetLastError(),
+            TranslateError()));
         NotifyTransportFailure(GetLastError(), L"Remote RPC host did not become ready.");
         StopRemoteHost();
         return false;
@@ -161,12 +218,17 @@ bool NamedPipeRpcClient::EnsureConnected()
     if (!ConnectToHost())
     {
         VTRACE(L"[RPC] ConnectToHost failed. error={} message={}", GetLastError(), TranslateError());
+        AppendClientMetricsLog(std::format(L"[RPC] ConnectToHost failed error={} message={}",
+            GetLastError(),
+            TranslateError()));
         NotifyTransportFailure(GetLastError(), L"Failed to connect to remote RPC pipe.");
         StopRemoteHost();
         return false;
     }
 
     VTRACE(L"[RPC] EnsureConnected connected successfully. pipe={}", m_pipeName);
+    AppendClientMetricsLog(std::format(L"[RPC] EnsureConnected connected pipe={}", m_pipeName));
+    StartInboundProcessorIfConfigured();
     m_readerRunning.store(true, std::memory_order_release);
     m_readerThread.emplace([this]()
     {
@@ -191,6 +253,9 @@ bool NamedPipeRpcClient::EnsureHostRunning()
         commandLine += L" --log-level verbose";
     VTRACE(L"[RPC] Scan host log file. path={}", m_hostLogFilePath);
     VTRACE(L"[RPC] Launching scan host. executable={} commandLine={}", hostExecutablePath, commandLine);
+    AppendClientMetricsLog(std::format(L"[RPC] Launching scan host executable={} commandLine={}",
+        hostExecutablePath,
+        commandLine));
 
     STARTUPINFO startupInfo{};
     startupInfo.cb = sizeof(startupInfo);
@@ -203,10 +268,18 @@ bool NamedPipeRpcClient::EnsureHostRunning()
     {
         VTRACE(L"[RPC] CreateProcess failed for scan host. executable={} error={} message={}",
             hostExecutablePath, GetLastError(), TranslateError());
+        AppendClientMetricsLog(std::format(L"[RPC] CreateProcess failed executable={} error={} message={}",
+            hostExecutablePath,
+            GetLastError(),
+            TranslateError()));
         return false;
     }
 
     VTRACE(L"[RPC] Scan host launched. pid={} pipe={}", processInfo.dwProcessId, m_pipeName);
+    AppendClientMetricsLog(std::format(L"[RPC] Scan host launched pid={} pipe={} log={}",
+        processInfo.dwProcessId,
+        m_pipeName,
+        m_hostLogFilePath));
     m_processInfo = processInfo;
     return true;
 }
@@ -282,7 +355,7 @@ bool NamedPipeRpcClient::SendJsonMessage(const std::string& json)
     return false;
 }
 
-std::optional<std::string> NamedPipeRpcClient::ReadJsonMessage()
+std::optional<std::string> NamedPipeRpcClient::ReadJsonMessage(const bool notifyFailure)
 {
     DWORD errorCode = ERROR_SUCCESS;
     std::wstring errorMessage;
@@ -316,18 +389,36 @@ std::optional<std::string> NamedPipeRpcClient::ReadJsonMessage()
         m_pipe = INVALID_HANDLE_VALUE;
     }
 
-    NotifyTransportFailure(errorCode, errorMessage);
+    if (notifyFailure)
+    {
+        NotifyTransportFailure(errorCode, errorMessage);
+    }
+    else
+    {
+        m_lastReadErrorCode = errorCode;
+        m_lastReadErrorMessage = errorMessage;
+    }
     return std::nullopt;
 }
 
 void NamedPipeRpcClient::ReaderLoop()
 {
     VTRACE(L"[RPC] ReaderLoop started. pipe={}", m_pipeName);
+    AppendClientMetricsLog(std::format(L"[RPC] ReaderLoop started pipe={}", m_pipeName));
+    m_lastReadErrorCode = ERROR_SUCCESS;
+    m_lastReadErrorMessage.clear();
     while (m_readerRunning.load(std::memory_order_acquire))
     {
-        const auto jsonOpt = ReadJsonMessage();
+        const auto jsonOpt = ReadJsonMessage(m_inboundQueueCapacity == 0);
         if (!jsonOpt.has_value())
             break;
+
+        if (m_inboundQueueCapacity != 0)
+        {
+            if (!EnqueueInboundFrame(std::move(jsonOpt.value())))
+                break;
+            continue;
+        }
 
         const auto eventOpt = TryDeserializeRpcEventMessage(jsonOpt.value());
         if (eventOpt.has_value())
@@ -335,8 +426,194 @@ void NamedPipeRpcClient::ReaderLoop()
     }
 
     m_readerRunning.store(false, std::memory_order_release);
+    if (m_inboundQueueCapacity != 0)
+    {
+        SignalInboundProcessorStop();
+        WaitForInboundProcessorDrain();
+        TraceInboundQueueSummary();
+        if (m_lastReadErrorCode != ERROR_SUCCESS && !m_shutdownRequested.load(std::memory_order_acquire))
+            NotifyTransportFailure(m_lastReadErrorCode, m_lastReadErrorMessage);
+    }
     if (m_verboseLogging)
         VTRACE(L"[RPC] ReaderLoop stopped. pipe={}", m_pipeName);
+    AppendClientMetricsLog(std::format(L"[RPC] ReaderLoop stopped pipe={}", m_pipeName));
+}
+
+void NamedPipeRpcClient::ProcessorLoop()
+{
+    VTRACE(L"[RPC] Inbound processor started. capacity={}", m_inboundQueueCapacity);
+    while (true)
+    {
+        const auto frameOpt = TakeInboundFrame();
+        if (!frameOpt.has_value())
+            break;
+
+        const std::uint64_t started = ReadPerformanceCounter();
+        const auto eventOpt = TryDeserializeRpcEventMessage(frameOpt->json);
+        const std::uint64_t elapsed = ReadPerformanceCounter() - started;
+        const bool terminalEvent = eventOpt.has_value() && IsTerminalEvent(eventOpt.value());
+
+        {
+            std::scoped_lock lock(m_inboundQueueMutex);
+            ++m_inboundStats.messagesProcessed;
+            m_inboundStats.processingTicks += elapsed;
+        }
+
+        if (eventOpt.has_value())
+        {
+            if (terminalEvent)
+            {
+                // Contract: the processor is single-threaded FIFO, so a terminal
+                // event is observed only after all prior progress frames. Quiet
+                // CSV mode exits during terminal dispatch, so emit metrics first.
+                TraceInboundQueueSummary();
+            }
+            DispatchEvent(eventOpt.value());
+        }
+    }
+
+    {
+        std::scoped_lock lock(m_inboundQueueMutex);
+        m_inboundProcessorStopped = true;
+    }
+    m_inboundDrained.notify_all();
+    m_inboundCanPush.notify_all();
+    VTRACE(L"[RPC] Inbound processor stopped. pipe={}", m_pipeName);
+}
+
+bool NamedPipeRpcClient::EnqueueInboundFrame(std::string json)
+{
+    const std::uint64_t started = ReadPerformanceCounter();
+    std::unique_lock lock(m_inboundQueueMutex);
+    m_inboundCanPush.wait(lock, [&]
+    {
+        return m_inboundStopping || m_inboundQueue.size() < m_inboundQueueCapacity;
+    });
+    const std::uint64_t elapsed = ReadPerformanceCounter() - started;
+
+    if (m_inboundStopping)
+        return false;
+
+    m_inboundQueue.push_back(InboundFrame{ std::move(json) });
+    ++m_inboundStats.messagesEnqueued;
+    m_inboundStats.enqueueWaitTicks += elapsed;
+    m_inboundStats.maxDepth = (std::max)(m_inboundStats.maxDepth, static_cast<std::uint64_t>(m_inboundQueue.size()));
+    lock.unlock();
+    m_inboundCanPop.notify_one();
+    return true;
+}
+
+std::optional<NamedPipeRpcClient::InboundFrame> NamedPipeRpcClient::TakeInboundFrame()
+{
+    std::unique_lock lock(m_inboundQueueMutex);
+    m_inboundCanPop.wait(lock, [&]
+    {
+        return m_inboundStopping || !m_inboundQueue.empty();
+    });
+
+    if (m_inboundQueue.empty())
+        return std::nullopt;
+
+    InboundFrame frame = std::move(m_inboundQueue.front());
+    m_inboundQueue.pop_front();
+    if (m_inboundQueue.empty())
+        m_inboundDrained.notify_all();
+    lock.unlock();
+    m_inboundCanPush.notify_one();
+    return frame;
+}
+
+void NamedPipeRpcClient::StartInboundProcessorIfConfigured()
+{
+    if (m_inboundQueueCapacity == 0 || m_processorThread.has_value())
+        return;
+
+    {
+        std::scoped_lock lock(m_inboundQueueMutex);
+        m_inboundStopping = false;
+        m_inboundProcessorStopped = false;
+        m_inboundQueue.clear();
+        m_inboundStats = {};
+    }
+
+    // Contract: queued inbound mode preserves wire order by using exactly one
+    // processor. The reader only extracts frames; parsing and observer dispatch
+    // remain on the same ordered path used by synchronous mode.
+    m_processorThread.emplace([this]()
+    {
+        ProcessorLoop();
+    });
+}
+
+void NamedPipeRpcClient::SignalInboundProcessorStop()
+{
+    {
+        std::scoped_lock lock(m_inboundQueueMutex);
+        m_inboundStopping = true;
+    }
+    m_inboundCanPop.notify_all();
+    m_inboundCanPush.notify_all();
+}
+
+void NamedPipeRpcClient::WaitForInboundProcessorDrain()
+{
+    if (m_inboundQueueCapacity == 0)
+        return;
+
+    std::unique_lock lock(m_inboundQueueMutex);
+    m_inboundDrained.wait(lock, [&]
+    {
+        return m_inboundProcessorStopped;
+    });
+}
+
+void NamedPipeRpcClient::StopInboundProcessor()
+{
+    SignalInboundProcessorStop();
+    if (m_processorThread.has_value() && m_processorThread->joinable())
+        m_processorThread->join();
+    m_processorThread.reset();
+}
+
+void NamedPipeRpcClient::TraceInboundQueueSummary() const
+{
+    if (m_inboundQueueCapacity == 0)
+        return;
+
+    InboundQueueStats stats{};
+    {
+        std::scoped_lock lock(m_inboundQueueMutex);
+        stats = m_inboundStats;
+    }
+
+    const std::wstring line = std::format(L"[RPC] InboundQueueSummary capacity={} enqueued={} processed={} maxDepth={} enqueueWaitMs={:.3f} processingMs={:.3f}",
+        m_inboundQueueCapacity,
+        stats.messagesEnqueued,
+        stats.messagesProcessed,
+        stats.maxDepth,
+        PerformanceTicksToMilliseconds(stats.enqueueWaitTicks),
+        PerformanceTicksToMilliseconds(stats.processingTicks));
+    VTRACE(L"{}", line);
+    AppendClientMetricsLog(line);
+}
+
+void NamedPipeRpcClient::AppendClientMetricsLog(const std::wstring_view line) const
+{
+    if (m_clientMetricsLogFilePath.empty())
+        return;
+
+    std::ofstream stream(m_clientMetricsLogFilePath, std::ios::out | std::ios::app | std::ios::binary);
+    if (!stream.is_open())
+        return;
+
+    const int length = WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), nullptr, 0, nullptr, nullptr);
+    if (length <= 0)
+        return;
+
+    std::string utf8(length, '\0');
+    (void)WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), utf8.data(), length, nullptr, nullptr);
+    stream.write(utf8.data(), static_cast<std::streamsize>(utf8.size()));
+    stream.write("\n", 1);
 }
 
 void NamedPipeRpcClient::NotifyTransportFailure(const unsigned long errorCode, const std::wstring& message)
@@ -408,6 +685,21 @@ void NamedPipeRpcClient::DispatchEvent(const RpcEventMessage& event)
             }
             handler->OnRemoteDirectoryProgress(typedEvent);
         }
+        else if constexpr (std::is_same_v<TEvent, RpcDirectoryProgressBatchEvent>)
+        {
+            VTRACE(L"[RPC] Received DirectoryProgressBatch. request={} items={}",
+                typedEvent.requestId, typedEvent.items.size());
+            for (const RpcDirectoryProgressEvent& item : typedEvent.items)
+            {
+                if (verboseLogging)
+                {
+                    VTRACE(L"[RPC] Replaying DirectoryProgress from batch. request={} path=\"{}\" finished={} files={} directories={}",
+                        item.requestId, item.directoryPath, item.finished,
+                        item.files.size(), item.directories.size());
+                }
+                handler->OnRemoteDirectoryProgress(item);
+            }
+        }
         else if constexpr (std::is_same_v<TEvent, RpcScanCompletedEvent>)
         {
             VTRACE(L"[RPC] Received ScanCompleted. request={}", typedEvent.requestId);
@@ -431,6 +723,26 @@ void NamedPipeRpcClient::DispatchEvent(const RpcEventMessage& event)
 bool NamedPipeRpcClient::IsVerboseLoggingEnabled()
 {
     return IsRpcVerboseLoggingEnabledFromCommandLine();
+}
+
+std::size_t NamedPipeRpcClient::GetInboundQueueCapacity()
+{
+    return ReadInboundQueueCapacityFromEnvironment();
+}
+
+std::wstring NamedPipeRpcClient::GetClientMetricsLogFilePath()
+{
+    const DWORD length = GetEnvironmentVariableW(L"WINDIRSTAT_RPC_CLIENT_LOG_FILE", nullptr, 0);
+    if (length == 0)
+        return {};
+
+    std::wstring value(length, L'\0');
+    const DWORD actualLength = GetEnvironmentVariableW(L"WINDIRSTAT_RPC_CLIENT_LOG_FILE", value.data(), length);
+    if (actualLength == 0 || actualLength >= length)
+        return {};
+
+    value.resize(actualLength);
+    return value;
 }
 
 std::wstring NamedPipeRpcClient::CreatePipeName()

@@ -222,6 +222,20 @@ std::string SerializeJsonArray(const std::vector<TValue>& values, const std::fun
     return json;
 }
 
+std::string SerializeDirectoryProgressPayload(const RpcDirectoryProgressEvent& progress, const bool includeKind)
+{
+    std::string json = "{";
+    if (includeKind)
+        json += "\"kind\":\"DirectoryProgressEvent\",";
+
+    json += "\"requestId\":" + std::to_string(progress.requestId) +
+        ",\"directoryPath\":\"" + EscapeJsonString(progress.directoryPath) +
+        "\",\"files\":" + SerializeJsonArray<DiscoveredFile>(progress.files, SerializeDiscoveredFile) +
+        ",\"directories\":" + SerializeJsonArray<DiscoveredDirectory>(progress.directories, SerializeDiscoveredDirectory) +
+        ",\"finished\":" + std::string(progress.finished ? "true" : "false") + "}";
+    return json;
+}
+
 std::optional<std::string> ExtractJsonArrayField(const std::string& json, const std::string& fieldName)
 {
     const std::string token = "\"" + fieldName + "\":[";
@@ -385,6 +399,43 @@ std::optional<DiscoveredDirectory> TryParseDiscoveredDirectory(const std::string
     directory.isProtectedReparsePoint = isProtectedOpt.value();
     return directory;
 }
+
+std::optional<RpcDirectoryProgressEvent> TryParseDirectoryProgressPayload(const std::string& json, const std::optional<std::uint64_t> fallbackRequestId = std::nullopt)
+{
+    const auto requestIdOpt = ExtractJsonIntegralField<std::uint64_t>(json, "requestId");
+    const auto directoryPathOpt = ExtractJsonStringField(json, "directoryPath");
+    const auto filesOpt = ExtractJsonArrayField(json, "files");
+    const auto directoriesOpt = ExtractJsonArrayField(json, "directories");
+    const auto finishedOpt = ExtractJsonBoolField(json, "finished");
+    if ((!requestIdOpt.has_value() && !fallbackRequestId.has_value()) ||
+        !directoryPathOpt.has_value() || !filesOpt.has_value() ||
+        !directoriesOpt.has_value() || !finishedOpt.has_value())
+    {
+        return std::nullopt;
+    }
+
+    RpcDirectoryProgressEvent event{};
+    event.requestId = requestIdOpt.value_or(fallbackRequestId.value_or(0));
+    event.directoryPath = Utf8ToWide(directoryPathOpt.value());
+    for (const auto& fileJson : SplitJsonObjectArray(filesOpt.value()))
+    {
+        const auto fileOpt = TryParseDiscoveredFile(fileJson);
+        if (!fileOpt.has_value())
+            return std::nullopt;
+        event.files.push_back(std::move(fileOpt.value()));
+    }
+
+    for (const auto& directoryJson : SplitJsonObjectArray(directoriesOpt.value()))
+    {
+        const auto directoryOpt = TryParseDiscoveredDirectory(directoryJson);
+        if (!directoryOpt.has_value())
+            return std::nullopt;
+        event.directories.push_back(std::move(directoryOpt.value()));
+    }
+
+    event.finished = finishedOpt.value();
+    return event;
+}
 }
 
 std::string SerializeRpcRequestMessage(const RpcRequestMessage& message)
@@ -422,12 +473,19 @@ std::string SerializeRpcEventMessage(const RpcEventMessage& message)
 {
     if (const auto* progress = std::get_if<RpcDirectoryProgressEvent>(&message))
     {
-        return std::string("{\"kind\":\"DirectoryProgressEvent\",\"requestId\":") +
-            std::to_string(progress->requestId) +
-            ",\"directoryPath\":\"" + EscapeJsonString(progress->directoryPath) +
-            "\",\"files\":" + SerializeJsonArray<DiscoveredFile>(progress->files, SerializeDiscoveredFile) +
-            ",\"directories\":" + SerializeJsonArray<DiscoveredDirectory>(progress->directories, SerializeDiscoveredDirectory) +
-            ",\"finished\":" + std::string(progress->finished ? "true" : "false") + "}";
+        return SerializeDirectoryProgressPayload(*progress, true);
+    }
+
+    if (const auto* batch = std::get_if<RpcDirectoryProgressBatchEvent>(&message))
+    {
+        return std::string("{\"kind\":\"DirectoryProgressBatchEvent\",\"requestId\":") +
+            std::to_string(batch->requestId) +
+            ",\"items\":" + SerializeJsonArray<RpcDirectoryProgressEvent>(
+                batch->items,
+                [](const RpcDirectoryProgressEvent& item)
+                {
+                    return SerializeDirectoryProgressPayload(item, false);
+                }) + "}";
     }
 
     if (const auto* completed = std::get_if<RpcScanCompletedEvent>(&message))
@@ -520,34 +578,30 @@ std::optional<RpcEventMessage> TryDeserializeRpcEventMessage(const std::string& 
 
     if (kindOpt.value() == "DirectoryProgressEvent")
     {
-        const auto directoryPathOpt = ExtractJsonStringField(json, "directoryPath");
-        const auto filesOpt = ExtractJsonArrayField(json, "files");
-        const auto directoriesOpt = ExtractJsonArrayField(json, "directories");
-        const auto finishedOpt = ExtractJsonBoolField(json, "finished");
-        if (!directoryPathOpt.has_value() || !filesOpt.has_value() || !directoriesOpt.has_value() || !finishedOpt.has_value())
+        const auto eventOpt = TryParseDirectoryProgressPayload(json, requestIdOpt);
+        if (!eventOpt.has_value())
             return std::nullopt;
 
-        RpcDirectoryProgressEvent event{};
-        event.requestId = requestIdOpt.value();
-        event.directoryPath = Utf8ToWide(directoryPathOpt.value());
-        for (const auto& fileJson : SplitJsonObjectArray(filesOpt.value()))
+        return RpcEventMessage(eventOpt.value());
+    }
+
+    if (kindOpt.value() == "DirectoryProgressBatchEvent")
+    {
+        const auto itemsOpt = ExtractJsonArrayField(json, "items");
+        if (!itemsOpt.has_value())
+            return std::nullopt;
+
+        RpcDirectoryProgressBatchEvent batch{};
+        batch.requestId = requestIdOpt.value();
+        for (const auto& itemJson : SplitJsonObjectArray(itemsOpt.value()))
         {
-            const auto fileOpt = TryParseDiscoveredFile(fileJson);
-            if (!fileOpt.has_value())
+            const auto itemOpt = TryParseDirectoryProgressPayload(itemJson, batch.requestId);
+            if (!itemOpt.has_value())
                 return std::nullopt;
-            event.files.push_back(std::move(fileOpt.value()));
+            batch.items.push_back(std::move(itemOpt.value()));
         }
 
-        for (const auto& directoryJson : SplitJsonObjectArray(directoriesOpt.value()))
-        {
-            const auto directoryOpt = TryParseDiscoveredDirectory(directoryJson);
-            if (!directoryOpt.has_value())
-                return std::nullopt;
-            event.directories.push_back(std::move(directoryOpt.value()));
-        }
-
-        event.finished = finishedOpt.value();
-        return RpcEventMessage(event);
+        return RpcEventMessage(std::move(batch));
     }
 
     if (kindOpt.value() == "ScanCompletedEvent")

@@ -28,6 +28,35 @@
 #include "ProgressDlg.h"
 #include "ScanEngineFactory.h"
 
+namespace
+{
+void AppendRpcClientMetricsLog(const std::wstring_view line)
+{
+    const DWORD length = GetEnvironmentVariableW(L"WINDIRSTAT_RPC_CLIENT_LOG_FILE", nullptr, 0);
+    if (length == 0)
+        return;
+
+    std::wstring path(length, L'\0');
+    const DWORD actualLength = GetEnvironmentVariableW(L"WINDIRSTAT_RPC_CLIENT_LOG_FILE", path.data(), length);
+    if (actualLength == 0 || actualLength >= length)
+        return;
+
+    path.resize(actualLength);
+    std::ofstream stream(path, std::ios::out | std::ios::app | std::ios::binary);
+    if (!stream.is_open())
+        return;
+
+    const int utf8Length = WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), nullptr, 0, nullptr, nullptr);
+    if (utf8Length <= 0)
+        return;
+
+    std::string utf8(utf8Length, '\0');
+    (void)WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), utf8.data(), utf8Length, nullptr, nullptr);
+    stream.write(utf8.data(), static_cast<std::streamsize>(utf8.size()));
+    stream.write("\n", 1);
+}
+}
+
 IMPLEMENT_DYNCREATE(CDirStatDoc, CDocument)
 
 CDirStatDoc::CDirStatDoc() :
@@ -132,6 +161,8 @@ BOOL CDirStatDoc::OnNewDocument()
 
 BOOL CDirStatDoc::OnOpenDocument(LPCWSTR lpszPathName)
 {
+    AppendRpcClientMetricsLog(std::format(L"[APP] OnOpenDocument path={}", lpszPathName));
+
     // Temporarily minimize extra views
     CMainFrame::Get()->MinimizeTreeMapView();
     CMainFrame::Get()->MinimizeExtensionView();
@@ -139,6 +170,7 @@ BOOL CDirStatDoc::OnOpenDocument(LPCWSTR lpszPathName)
     // Decode list of folders to scan
     const std::wstring spec = lpszPathName;
     std::vector<std::wstring> selections = SplitString(spec);
+    AppendRpcClientMetricsLog(std::format(L"[APP] OnOpenDocument selections={}", selections.size()));
 
     // Prepare for new root and delete any existing data
     CDocument::OnNewDocument();
@@ -1774,6 +1806,7 @@ void CDirStatDoc::OnContextMenuExplore(UINT nID)
 
 void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
 {
+    AppendRpcClientMetricsLog(std::format(L"[APP] StartScanningEngine items={}", items.size()));
     m_scanStart = GetTickCount64();
     TRACE(L"[PERF] scan start\n");
     
@@ -1884,11 +1917,13 @@ void CDirStatDoc::StartScanningEngine(std::vector<CItem*> items)
             std::ranges::any_of(m_scanItems | std::views::drop(index + 1), isScannableRoot);
         if (!started)
         {
+            AppendRpcClientMetricsLog(std::format(L"[APP] StartScan root={} expectMoreInputs={}", request.rootPath, request.expectMoreInputs ? 1 : 0));
             GetScanEngine()->StartScan(request, *m_scanObserver);
             started = true;
         }
         else
         {
+            AppendRpcClientMetricsLog(std::format(L"[APP] Enqueue root={}", request.rootPath));
             StartScan(request);
         }
     }
